@@ -2,8 +2,6 @@ from google.cloud import language_v1
 from google.cloud.language_v1 import enums
 from google.oauth2 import service_account
 
-from v2 import Entity
-
 # set google application credentials
 credentials = service_account.Credentials.from_service_account_file("fire-sentiment-analysis-bf24604da498.json")
 

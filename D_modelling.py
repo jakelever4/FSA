@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import geopandas as gpd
 from shapely.geometry import Point, Polygon
 import google_analyse_sentiment
-import complete_sentiment_data
+import B_complete_sentiment_data
 from sklearn import metrics
 import numpy as np
 
