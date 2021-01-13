@@ -1,2 +1,5 @@
 # Project exclude paths
 /venv/
+/Global_fire_atlas_V1_ignitions_2016/
+/Global_fire_atlas_V1_perimeter_2016/
+/USA_Canada_ShapefileMerge/
