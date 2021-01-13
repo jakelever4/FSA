@@ -25,7 +25,7 @@ plt.xlabel('Lon')
 plt.ylabel('Lat')
 # plt.tight_layout()
 
-plt.savefig('2016_all_fires.png')
+plt.savefig('graphs/2016_all_fires.png')
 plt.show()
 
 
@@ -46,7 +46,7 @@ ax.set_ylim([20,80])
 plt.legend(prop={'size': 10}, loc='lower left')
 plt.title('North American Area Scope')
 
-plt.savefig('NA_Scope.png')
+plt.savefig('graphs/NA_Scope.png')
 plt.show()
 
 
@@ -62,7 +62,7 @@ plt.title('North American (English Speaking) Fires Coloured by Sentiment Score')
 plt.xlabel('Lon')
 plt.ylabel('Lat')
 
-plt.savefig('NA_Fires_Map_Sentiment.png')
+plt.savefig('graphs/NA_Fires_Map_Sentiment.png')
 plt.show()
 
 
@@ -78,7 +78,7 @@ plt.title('North American (English Speaking) Fires Coloured by Magnitude Score')
 plt.xlabel('Lon')
 plt.ylabel('Lat')
 
-plt.savefig('NA_Fires_Map_Magnitude.png')
+plt.savefig('graphs/NA_Fires_Map_Magnitude.png')
 plt.show()
 
 
@@ -90,5 +90,5 @@ p = locations[locations > 15].plot(kind='bar', ax=ax)
 plt.tight_layout()
 plt.title('Histogram of Distinct Locations (Frequency > 15) Found From Geocode Analysis')
 
-plt.savefig('location_freq_histogram.png')
+plt.savefig('graphs/location_freq_histogram.png')
 plt.show()
