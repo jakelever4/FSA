@@ -14,7 +14,7 @@ def get_loc_from_results(reverse_geocode_result):
             state = ''
             for comp in result['address_components']:
                 if 'administrative_area_level_1' in comp['types']:
-                    state = comp['long_name'].replace(' ','')
+                    state = comp['long_name']
                     state_short = comp['short_name'].replace(' ', '')
 
 
@@ -22,13 +22,13 @@ def get_loc_from_results(reverse_geocode_result):
             return location
 
 
-def geocode_lookup(lat, long):
+def geocode_lookup(lat, long, countries):
     # Look up an address with reverse geocoding
     reverse_geocode_result = gmaps.reverse_geocode((lat, long))
     for result in reverse_geocode_result:
         # print(result['types'])
         # print(result['formatted_address'])
-        if 'country' in result['types'] and (result['formatted_address'] == 'United States' or result['formatted_address'] == 'Canada'):
+        if 'country' in result['types'] and (result['formatted_address'] in countries):
             print('Found NA fire: {}'.format(result['formatted_address']))
             try:
                 loc = get_loc_from_results(reverse_geocode_result)
@@ -37,8 +37,8 @@ def geocode_lookup(lat, long):
                 return None
             print(loc)
             return loc
-        elif 'country' in result['types'] and result['formatted_address'] != 'United States':
-            print('not US fire. Country: {}'.format(result['formatted_address']))
+        elif 'country' in result['types'] and result['formatted_address'] not in countries:
+            print('fire in different country. Country: {}'.format(result['formatted_address']))
             return None
 
 

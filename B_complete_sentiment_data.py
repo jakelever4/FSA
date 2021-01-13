@@ -20,15 +20,15 @@ def get_queries_from_location(state, state_short, location_list):
         q3 += location + ' OR '
     # print(q3)
 
-    state_1 = '#' + state + 'Wildfires'
-    state_2 = '#' + state + 'Fires'
+    state_1 = '#' + state.replace(' ', '') + 'Wildfires'
+    state_2 = '#' + state.replace(' ', '') + 'Fires'
     state_short_1 = '#' + state_short + 'Fires'
     state_short_2 = '#' + state_short + 'Wildfires'
 
     q1 = '(' + q3 + state + ' OR ' + state_short + ') AND ( Wildfire OR Wildfires OR fires OR fire OR burning OR burn OR Landscape burn OR wildland burn )'
     q2 = state_1  + ' OR ' + state_2 + ' OR ' + state_short_1 + ' OR ' + state_short_2
     q = q1 + ' OR ' + q2
-    # print(q)
+    print(q)
 
     return q
 
@@ -45,7 +45,7 @@ def get_start_end_dates(row):
         from_date = str(datetime.strptime(row[5], '%Y-%m-%d').date() - timedelta(days=days_lag_pre))
         to_date = str(datetime.strptime(row[6], '%Y-%m-%d').date() + timedelta(days=days_lag_post))
         # print('from date {} to date {}'.format(from_date, to_date))
-        print('duration {}'.format(row[7]))
+        # print('duration {}'.format(row[7]))
         return from_date, to_date
     except KeyError:
         print('Cannot generate start and end dates of fire.')
@@ -93,38 +93,37 @@ def get_sentiment_for_text(text):
     return sentiment
 
 
-# with open("NA_ignitions_2016_I.csv", 'r') as dataset_incomplete:
-#
-#     reader = csv.reader(dataset_incomplete, delimiter=',')
-#
-#     for row in reader:
-#         if check_sentiment_column(row) and int(row[0]) > 34570:
-#             start_date, end_date = get_start_end_dates(row)
-#             location_list, state, state_short = get_location_list(row)
-#             query = get_queries_from_location(state, state_short, location_list)
-#
-#             tweets = get_tweets(start_date,end_date, query, filters)
-#             grouped_text = group_tweet_texts(tweets)
-#
-#             if grouped_text != '':
-#                 sentiment = get_sentiment_for_text(grouped_text)
-#                 score = sentiment.score
-#                 magnitude = sentiment.magnitude
-#                 num_tweets = len(tweets)
-#             else:
-#                 score = 0
-#                 magnitude = 0
-#                 num_tweets = 0
-#
-#             row[13] = score
-#             row.append(magnitude)
-#             row.append(num_tweets)
-#
-#             with open('NA_ignitions_2016.csv', 'a') as dataset:
-#                 writer = csv.writer(dataset, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-#                 writer.writerow(row)
-#
-#             print('row ID {} saved'.format(row[0]))
-#
-#     print('dataset sentiment analysed successfully')
+with open("datasets/AUS_Ignitions_2016_I.csv", 'r') as dataset_incomplete:
 
+    reader = csv.reader(dataset_incomplete, delimiter=',')
+
+    for row in reader:
+        if check_sentiment_column(row) and int(row[0]) > -1 :
+            start_date, end_date = get_start_end_dates(row)
+            location_list, state, state_short = get_location_list(row)
+            query = get_queries_from_location(state, state_short, location_list)
+
+            tweets = get_tweets(start_date,end_date, query, filters)
+            grouped_text = group_tweet_texts(tweets)
+
+            if grouped_text != '':
+                sentiment = get_sentiment_for_text(grouped_text)
+                score = sentiment.score
+                magnitude = sentiment.magnitude
+                num_tweets = len(tweets)
+            else:
+                score = 0
+                magnitude = 0
+                num_tweets = 0
+
+            row[13] = score
+            row.append(magnitude)
+            row.append(num_tweets)
+
+            with open('NA_ignitions_2016.csv', 'a') as dataset:
+                writer = csv.writer(dataset, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+                writer.writerow(row)
+
+            print('row ID {} saved'.format(row[0]))
+
+    print('dataset sentiment analysed successfully')
