@@ -15,8 +15,18 @@ dfi = pd.read_csv('datasets/AUS_ignitions_2016_I.csv')
 # remove fires which have no tweets associated with them
 df = df[df.num_tweets != 0]
 # print(df.shape)
-crs  = {'init': 'epsg:4326'}
+crs = {'init': 'epsg:4326'}
 
+
+# SHOW CORRELATION MATRIX FOR THE VARIABLES
+f = plt.figure(figsize=(13, 8))
+plt.matshow(df.corr(), fignum=f.number)
+plt.xticks(range(df.select_dtypes(['number']).shape[1]), df.select_dtypes(['number']).columns, fontsize=14, rotation=45)
+plt.yticks(range(df.select_dtypes(['number']).shape[1]), df.select_dtypes(['number']).columns, fontsize=14)
+cb = plt.colorbar()
+cb.ax.tick_params(labelsize=14)
+plt.title('Correlation Matrix', fontsize=16);
+plt.show()
 
 
 # data visualisation

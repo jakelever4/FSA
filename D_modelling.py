@@ -12,13 +12,11 @@ import matplotlib.pyplot as plt
 # import descartes
 import geopandas as gpd
 from shapely.geometry import Point, Polygon
-import google_analyse_sentiment
-import B_complete_sentiment_data
 from sklearn import metrics
 import numpy as np
 
 pd.set_option("display.max_rows", None, "display.max_columns", None)
-df = pd.read_csv('NA_ignitions_2016.csv')
+df = pd.read_csv('datasets/AUS_Ignitions_2016.csv')
 # print(df.shape)
 
 
@@ -28,14 +26,6 @@ df = df[df.num_tweets != 0]
 
 
 # data information
-
-
-# X = complete_sentiment_data.get_queries_from_location('California', 'CA', "Monterey County, CA, USA".split(','))
-# print(X)
-# sentiment = google_analyse_sentiment.analyze('#CAStateParks urges the public to avoid traveling to impacted park units particularly in Santa Cruz, Sonoma Coast, Monterey  & Bay Area due to wildfires & safety concerns. Air quality remains poor. For the latest updates on park closures, please visit')
-# print(sentiment)
-
-
 num_tweets = df['num_tweets'].sum()
 print('num tweets: {}'.format(num_tweets))
 
@@ -43,7 +33,7 @@ print('min number of tweets: {}, max number of tweets: {}, avg number of tweets:
 
 print('min magnitude: {}, max magnitude: {}, avg magnitude: {}, st dev {}'.format(df['magnitude'].min(), df['magnitude'].max(), df['magnitude'].mean(), df['magnitude'].std()))
 
-print('min sentiment: {}, max sentiment: {}, avg sentiment: {}, st dev {}'.format(df['sentiment_score'].min(), df['sentiment_score'].max(), df['sentiment_score'].mean(), df['sentiment_score'].std()))
+print('min sentiment: {}, max sentiment: {}, avg sentiment: {}, st dev {}'.format(df['sentiment'].min(), df['sentiment'].max(), df['sentiment'].mean(), df['sentiment'].std()))
 
 
 locations = df['location'].value_counts()
@@ -54,7 +44,7 @@ print('')
 
 def create_random_forest_physical_regressor(target):
     target = [target]
-    predictors = ['sentiment_score', 'magnitude', 'num_tweets']
+    predictors = ['sentiment', 'magnitude', 'num_tweets']
     df[predictors] = df[predictors] / df[predictors].max()
     print("Target: {}".format(target))
 
@@ -146,7 +136,7 @@ def create_random_forest_sentiment_regressor(target):
 
 
 mag_regr = create_random_forest_sentiment_regressor('magnitude')
-mag_regr = create_random_forest_sentiment_regressor('sentiment_score')
+mag_regr = create_random_forest_sentiment_regressor('sentiment')
 mag_regr = create_random_forest_sentiment_regressor('num_tweets')
 
 regr = create_random_forest_physical_regressor('latitude')
