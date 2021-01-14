@@ -6,7 +6,9 @@ import pandas as pd
 
 
 pd.set_option("display.max_rows", None, "display.max_columns", None)
-df = pd.read_csv('datasets/NA_ignitions_2016.csv')
+df = pd.read_csv('datasets/AUS_ignitions_2016.csv')
+dfi = pd.read_csv('datasets/AUS_ignitions_2016_I.csv')
+
 # print(df.shape)
 
 
@@ -16,79 +18,93 @@ df = df[df.num_tweets != 0]
 crs  = {'init': 'epsg:4326'}
 
 
-# show all fires
-all_fires = gpd.read_file('Global_fire_atlas_V1_ignitions_2016/Global_fire_atlas_V1_ignitions_2016.shp')
-fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,8))
-all_fires.plot(ax=ax, marker='.', markersize=1)
-plt.title('Global Fire Atlas 2016 Ignitions (All Fires)')
-plt.xlabel('Lon')
-plt.ylabel('Lat')
-# plt.tight_layout()
-
-plt.savefig('graphs/2016_all_fires.png')
-plt.show()
-
-
 
 # data visualisation
 geometry = [Point(xy) for xy in zip( df['longitude'], df['latitude'])]
+geometryi = [Point(xy) for xy in zip( dfi['longitude'], dfi['latitude'])]
+
 geo_df = gpd.GeoDataFrame(df, crs=crs, geometry=geometry)
+geo_dfi = gpd.GeoDataFrame(dfi, crs=crs, geometry=geometryi)
 
-canada_map = gpd.read_file('USA_Canada_ShapefileMerge/USA_Canada_ShapefileMerge.shp')
+
+aus_map = gpd.read_file('nsaasr9nnd_02211a04es_geo___/aust_cd66states.shp')
 
 
-# Plotted map with NA states
+# Plotted ALL fires
 fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,8))
-canada_map.plot(ax=ax, column='StateName')
-# ax.set_aspect('auto')
-ax.set_xlim([-180, -55])
-ax.set_ylim([20,80])
-plt.legend(prop={'size': 10}, loc='lower left')
-plt.title('North American Area Scope')
+aus_map.plot(ax=ax, color='grey')
+geo_dfi.plot(ax =ax, markersize=5, marker='.')
+plt.title('All Austrailian Fires in Global Fire Atlas Scope')
+plt.xlabel('Lon')
+plt.ylabel('Lat')
 
-plt.savefig('graphs/NA_Scope.png')
+# plt.savefig('graphs/AUS_Scope.png')
 plt.show()
 
 
 # PLOTTED FIRE MAP WITH SENTIMENT COLOR
 fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,8))
-canada_map.plot(ax=ax, alpha=0.8, color='grey')
-geo_df[geo_df['sentiment_score'] > -10].plot(column='sentiment_score', ax =ax, markersize=10, marker='.', label='Sentiment Score', legend=True)
+aus_map.plot(ax=ax, alpha=0.8, color='grey')
+geo_df.plot(column='sentiment', ax =ax, markersize=5, marker='.', label='Sentiment Score', legend=True)
 # ax.set_aspect('auto')
-ax.set_xlim([-180, -55])
-ax.set_ylim([20,80])
 plt.legend(prop={'size': 10}, loc='lower left')
-plt.title('North American (English Speaking) Fires Coloured by Sentiment Score')
+plt.title('Austrailian Fires Coloured by Sentiment Score')
 plt.xlabel('Lon')
 plt.ylabel('Lat')
 
-plt.savefig('graphs/NA_Fires_Map_Sentiment.png')
+# plt.savefig('graphs/AUS_Fires_Map_Sentiment.png')
 plt.show()
 
 
 # PLOTTED FIRE MAP WITH MAGNITUDE COLOR
 fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,8))
-canada_map.plot(ax=ax, alpha=0.8, color='grey')
-geo_df[geo_df['magnitude'] > -10].plot(column='magnitude', ax =ax, markersize=10, marker='.', label='Magnitude', legend=True)
+aus_map.plot(ax=ax, alpha=0.8, color='grey')
+geo_df.plot(column='magnitude', ax =ax, markersize=5, marker='.', label='Magnitude Score', legend=True)
 # ax.set_aspect('auto')
-ax.set_xlim([-180, -55])
-ax.set_ylim([20,80])
 plt.legend(prop={'size': 10}, loc='lower left')
-plt.title('North American (English Speaking) Fires Coloured by Magnitude Score')
+plt.title('Austrailian Fires Coloured by Magnitude Score')
 plt.xlabel('Lon')
 plt.ylabel('Lat')
 
-plt.savefig('graphs/NA_Fires_Map_Magnitude.png')
+# plt.savefig('graphs/AUS_Fires_Map_Magnitude.png')
 plt.show()
 
 
-# HISTOGRAM OF LOCATION FREQUENCY
-fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,6))
-locations = df['location'].value_counts()
-p = locations[locations > 15].plot(kind='bar', ax=ax)
+# PLOTTED FIRE MAP WITH NUM_TWEETS COLOR
+fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,8))
+aus_map.plot(ax=ax, alpha=0.8, color='grey')
+geo_df.plot(column='num_tweets', ax =ax, markersize=5, marker='.', label='Num_tweets', legend=True)
 # ax.set_aspect('auto')
-plt.tight_layout()
-plt.title('Histogram of Distinct Locations (Frequency > 15) Found From Geocode Analysis')
+plt.legend(prop={'size': 10}, loc='lower left')
+plt.title('Austrailian Fires Coloured by Number of Tweets')
+plt.xlabel('Lon')
+plt.ylabel('Lat')
 
-plt.savefig('graphs/location_freq_histogram.png')
+# plt.savefig('graphs/AUS_Fires_Map_num_tweets.png')
 plt.show()
+
+
+# # HISTOGRAM OF LOCATION FREQUENCY
+# fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,6))
+# locations = df['location'].value_counts()
+# p = locations[locations > 15].plot(kind='bar', ax=ax)
+# # ax.set_aspect('auto')
+# plt.tight_layout()
+# plt.title('Histogram of Distinct Locations (Frequency > 15) Found From Geocode Analysis')
+#
+# plt.savefig('graphs/location_freq_histogram.png')
+# plt.show()
+#
+#
+#
+# # show all fires
+# all_fires = gpd.read_file('Global_fire_atlas_V1_ignitions_2016/Global_fire_atlas_V1_ignitions_2016.shp')
+# fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,8))
+# all_fires.plot(ax=ax, marker='.', markersize=1)
+# plt.title('Global Fire Atlas 2016 Ignitions (All Fires)')
+# plt.xlabel('Lon')
+# plt.ylabel('Lat')
+# # plt.tight_layout()
+#
+# plt.savefig('graphs/2016_all_fires.png')
+# plt.show()

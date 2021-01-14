@@ -1,8 +1,10 @@
 import snscrape.modules.twitter as sntwitter
+import snscrape.base as snscrape
 import tweet_obj
 import google_analyse_sentiment
 import csv
 from datetime import datetime, timedelta
+import time
 import random
 import numpy as np
 
@@ -13,7 +15,7 @@ days_lag_post = 5
 
 def get_queries_from_location(state, state_short, location_list):
     state_list = location_list[0].split()
-    location_list[0] = state_list[0]
+    location_list += state_list
 
     q3 = ''
     for location in location_list:
@@ -97,13 +99,41 @@ with open("datasets/AUS_Ignitions_2016_I.csv", 'r') as dataset_incomplete:
 
     reader = csv.reader(dataset_incomplete, delimiter=',')
 
+    # with open('datasets/AUS_Ignitions_2016.csv', 'w') as dataset:
+    #     writer = csv.writer(dataset, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    #     writer.writerow(['fire_ID',
+    #                      'latitude',
+    #                      'longitude',
+    #                      'size',
+    #                      'perimeter',
+    #                      'start_date',
+    #                      'end_date',
+    #                      'duration',
+    #                      'speed',
+    #                      'expansion',
+    #                      'location',
+    #                      'state',
+    #                      'state_short',
+    #                      'sentiment',
+    #                      'magnitude',
+    #                      'num_tweets'
+    #                      ])
+
     for row in reader:
-        if check_sentiment_column(row) and int(row[0]) > -1 :
+        if check_sentiment_column(row) and int(row[0]) >= 876604: # 866562:
             start_date, end_date = get_start_end_dates(row)
             location_list, state, state_short = get_location_list(row)
             query = get_queries_from_location(state, state_short, location_list)
 
-            tweets = get_tweets(start_date,end_date, query, filters)
+            while True:
+                try:
+                    tweets = get_tweets(start_date,end_date, query, filters)
+                except snscrape.ScraperException:
+                    print('Timed out. sleeping 1 min')
+                    time.sleep(60)
+                    continue
+                break
+
             grouped_text = group_tweet_texts(tweets)
 
             if grouped_text != '':
@@ -111,19 +141,15 @@ with open("datasets/AUS_Ignitions_2016_I.csv", 'r') as dataset_incomplete:
                 score = sentiment.score
                 magnitude = sentiment.magnitude
                 num_tweets = len(tweets)
-            else:
-                score = 0
-                magnitude = 0
-                num_tweets = 0
 
-            row[13] = score
-            row.append(magnitude)
-            row.append(num_tweets)
+                row[13] = score
+                row.append(magnitude)
+                row.append(num_tweets)
 
-            with open('NA_ignitions_2016.csv', 'a') as dataset:
-                writer = csv.writer(dataset, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-                writer.writerow(row)
+                with open('datasets/AUS_Ignitions_2016.csv', 'a') as dataset:
+                    writer = csv.writer(dataset, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+                    writer.writerow(row)
 
-            print('row ID {} saved'.format(row[0]))
+                print('row ID {} saved'.format(row[0]))
 
     print('dataset sentiment analysed successfully')
