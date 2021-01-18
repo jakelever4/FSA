@@ -25,7 +25,9 @@ plt.xticks(range(df.select_dtypes(['number']).shape[1]), df.select_dtypes(['numb
 plt.yticks(range(df.select_dtypes(['number']).shape[1]), df.select_dtypes(['number']).columns, fontsize=14)
 cb = plt.colorbar()
 cb.ax.tick_params(labelsize=14)
-plt.title('Correlation Matrix', fontsize=16);
+plt.title('Correlation Matrix', fontsize=16)
+
+plt.savefig('graphs/AUS_Corelation_matrix.png')
 plt.show()
 
 
@@ -48,7 +50,7 @@ plt.title('All Austrailian Fires in Global Fire Atlas Scope')
 plt.xlabel('Lon')
 plt.ylabel('Lat')
 
-# plt.savefig('graphs/AUS_Scope.png')
+plt.savefig('graphs/AUS_Scope.png')
 plt.show()
 
 
@@ -62,7 +64,7 @@ plt.title('Austrailian Fires Coloured by Sentiment Score')
 plt.xlabel('Lon')
 plt.ylabel('Lat')
 
-# plt.savefig('graphs/AUS_Fires_Map_Sentiment.png')
+plt.savefig('graphs/AUS_Fires_Map_Sentiment.png')
 plt.show()
 
 
@@ -76,7 +78,7 @@ plt.title('Austrailian Fires Coloured by Magnitude Score')
 plt.xlabel('Lon')
 plt.ylabel('Lat')
 
-# plt.savefig('graphs/AUS_Fires_Map_Magnitude.png')
+plt.savefig('graphs/AUS_Fires_Map_Magnitude.png')
 plt.show()
 
 
@@ -90,23 +92,27 @@ plt.title('Austrailian Fires Coloured by Number of Tweets')
 plt.xlabel('Lon')
 plt.ylabel('Lat')
 
-# plt.savefig('graphs/AUS_Fires_Map_num_tweets.png')
+plt.savefig('graphs/AUS_Fires_Map_num_tweets.png')
 plt.show()
 
 
-# # HISTOGRAM OF LOCATION FREQUENCY
-# fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,6))
-# locations = df['location'].value_counts()
-# p = locations[locations > 15].plot(kind='bar', ax=ax)
-# # ax.set_aspect('auto')
-# plt.tight_layout()
-# plt.title('Histogram of Distinct Locations (Frequency > 15) Found From Geocode Analysis')
-#
-# plt.savefig('graphs/location_freq_histogram.png')
-# plt.show()
-#
-#
-#
+# HISTOGRAM OF LOCATION FREQUENCY
+fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,6))
+locations = df['location'].value_counts()
+p = locations[locations > 5].plot(kind='bar', ax=ax)
+# ax.set_aspect('auto')
+plt.tight_layout()
+plt.title('Histogram of Distinct Locations (Frequency > 15) Found From Geocode Analysis')
+
+plt.savefig('graphs/AUS_location_freq_histogram.png')
+plt.show()
+
+locations = df['location'].value_counts()
+print('number of locations: {}'.format(locations.size))
+
+print('')
+
+
 # # show all fires
 # all_fires = gpd.read_file('Global_fire_atlas_V1_ignitions_2016/Global_fire_atlas_V1_ignitions_2016.shp')
 # fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,8))
