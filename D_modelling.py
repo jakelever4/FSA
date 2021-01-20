@@ -15,6 +15,7 @@ from shapely.geometry import Point, Polygon
 from sklearn import metrics
 import numpy as np
 import math
+import pickle
 
 
 
@@ -137,6 +138,9 @@ def create_random_forest_physical_regressor(target, df):
 
     print('')
 
+    filename = 'models/' + target[0] + '_predictor_AUS.p'
+    pickle.dump(regr, open(filename, 'wb'))
+
     return regr
 
 
@@ -183,6 +187,9 @@ def create_random_forest_sentiment_regressor(target):
     print('RMSE: {}'.format(rmse))
 
     print('')
+
+    filename = 'models/' + target[0] + '_predictor_AUS.p'
+    pickle.dump(regr, open(filename, 'wb'))
 
     return regr
 
