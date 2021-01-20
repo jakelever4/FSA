@@ -293,16 +293,18 @@ def calculate_distance_from_coordinate_estimate(lon_true, lat_true, lon_pred, la
 
 
 # Run random forest regression models on variables of the opposing type
-# regressor = create_random_forest_sentiment_regressor('magnitude')
-# regressor = create_random_forest_sentiment_regressor('sentiment')
-# regressor = create_random_forest_sentiment_regressor('num_tweets')
+regressor = create_random_forest_sentiment_regressor('magnitude')
+regressor = create_random_forest_sentiment_regressor('sentiment')
+regressor = create_random_forest_sentiment_regressor('num_tweets')
 
-latitude_regressor = create_random_forest_location_regressor(df)
-# regressor = create_random_forest_physical_regressor('size', df)
-# regressor = create_random_forest_physical_regressor('perimeter', df)
-# regressor = create_random_forest_physical_regressor('duration', df)
-# regressor = create_random_forest_physical_regressor('speed', df)
-# regressor = create_random_forest_physical_regressor('expansion', df)
+# latitude_regressor = create_random_forest_location_regressor(df)
+regressor = create_random_forest_physical_regressor('longitude', df)
+regressor = create_random_forest_physical_regressor('latitude', df)
+regressor = create_random_forest_physical_regressor('size', df)
+regressor = create_random_forest_physical_regressor('perimeter', df)
+regressor = create_random_forest_physical_regressor('duration', df)
+regressor = create_random_forest_physical_regressor('speed', df)
+regressor = create_random_forest_physical_regressor('expansion', df)
 
 # Run random forest regression on ALL remaining variables
 # regressor = create_random_forest_regressor_all_vars('magnitude', df)
