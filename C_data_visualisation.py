@@ -3,12 +3,19 @@ import matplotlib.pyplot as plt
 import geopandas as gpd
 from shapely.geometry import Point, Polygon
 import pandas as pd
+from pandas.plotting import scatter_matrix
+import seaborn as sns
 
 
 pd.set_option("display.max_rows", None, "display.max_columns", None)
-df = pd.read_csv('datasets/AUS_ignitions_2016.csv')
-dfi = pd.read_csv('datasets/AUS_ignitions_2016_I.csv')
+# df = pd.read_csv('datasets/AUS_ignitions_2016.csv')
+# dfi = pd.read_csv('datasets/AUS_ignitions_2016_I.csv')
 
+
+
+x = pd.read_csv('datasets/NA_ignitions_2016.csv', error_bad_lines=False)
+hist = x.hist(column='duration', bins=50)
+# hist.show()
 # print(df.shape)
 
 
@@ -20,7 +27,9 @@ crs = {'init': 'epsg:4326'}
 
 # SHOW CORRELATION MATRIX FOR THE VARIABLES
 f = plt.figure(figsize=(13, 8))
-plt.matshow(df.corr(), fignum=f.number)
+corr = df.corr()
+corr[corr<0.8] = 0
+plt.matshow(corr, fignum=f.number)
 plt.xticks(range(df.select_dtypes(['number']).shape[1]), df.select_dtypes(['number']).columns, fontsize=14, rotation=45)
 plt.yticks(range(df.select_dtypes(['number']).shape[1]), df.select_dtypes(['number']).columns, fontsize=14)
 cb = plt.colorbar()
@@ -29,6 +38,10 @@ plt.title('Correlation Matrix', fontsize=16)
 
 plt.savefig('graphs/AUS_Corelation_matrix.png')
 plt.show()
+
+
+# SCATTER MATRIX
+scatter_matrix(df, alpha=0.2)
 
 
 # data visualisation

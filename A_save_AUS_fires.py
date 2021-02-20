@@ -2,6 +2,7 @@ import fiona
 import csv
 import geocode
 import location_obj
+import pandas as pd
 
 
 # BOUNDING BOX FOR AUSTRAILIA
@@ -9,6 +10,10 @@ countries = ['Australia', 'New Zealand']
 lat_search = [-10.6681857235, -46.641235447]
 lon_search = [113.338953078, 178.517093541]
 
+
+df = pd.read_csv('datasets/COMBINED_NA_AUS_Ignitions_2016.csv')
+ids = df[['fire_ID', 'location', 'state', 'state_short']]
+ids.astype({'fire_ID': 'int32'})
 
 def check_coords_in_bounding_box(lat, lon):
     if lat_search[0] < lat < lat_search[1] or lat_search[1] < lat < lat_search[0]:
@@ -25,7 +30,14 @@ def create_database(num_rows):
     in_box_index = 0
     in_box_fire_ids = []
 
-    with open('datasets/AUS_Ignitions_2016_I.csv', mode='w') as dataset:
+    df1 = pd.read_csv('datasets/AUS_Ignitions_2016_I.csv')
+    df2 = pd.read_csv('datasets/NA_ignitions_2016_I.csv')
+    id1 = df1[['fire_ID', 'location', 'state', 'state_short']]
+    id2 = df2[['fire_ID', 'location', 'state', 'state_short']]
+    ids = pd.concat([id1,id2])
+    ids.astype({'fire_ID': 'int32'})
+
+    with open('datasets/V4_Ignitions_2016_I.csv', mode='w') as dataset:
         writer = csv.writer(dataset, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         writer.writerow([
             "fire_ID",
@@ -38,12 +50,27 @@ def create_database(num_rows):
             "duration",
             "speed",
             "expansion",
+            'direction',
+            'landcover',
             'location',
             "state",
             "state_short",
+            'pop_density',
+            'cloud_cover',
+            'humidity',
+            'precip_intensity',
+            'precip_prob',
+            'pressure',
+            'max_temp',
+            'uv_index',
+            'wind_bearing',
+            'wind_speed',
             'sentiment',
+            'overall_sentiment',
             'magnitude',
-            'num_tweets'
+            'overall_magnitude',
+            'num_tweets',
+            'total_tweets'
         ])
 
         for i in shape:
@@ -55,25 +82,46 @@ def create_database(num_rows):
             except StopIteration:
                 print('All entries in collection have been analysed! {} total. {} fell within bounding box'.format(index, in_box_index))
                 for id in in_box_fire_ids:
-                    print(id)
+                    None
+                    # print(id)
                 return
 
             dic = item['properties']
             print('fire id: {}'.format(dic['fire_ID']))
 
-            if dic['fire_ID'] > 0:
+            fire_id = dic['fire_ID']
+            old_ids = ids['fire_ID']
+
+            if fire_id in old_ids.values:
+
+                old_dataset_row = ids[ids['fire_ID'] == dic['fire_ID']]
+                print(old_dataset_row)
 
                 lat = dic["latitude"]
                 long = dic["longitude"]
 
-                in_box = check_coords_in_bounding_box(lat,long)
+                in_box = True # check_coords_in_bounding_box(lat,long)
                 if in_box:
 
                     in_box_index += 1
                     in_box_fire_ids.append(dic['fire_ID'])
                     print('inside bounding box! index: {}'.format(in_box_index))
 
-                    location = geocode.geocode_lookup(lat, long, countries)
+
+                    try:
+                        location = old_dataset_row['location'].values[0]
+                    except KeyError:
+                        location = old_dataset_row['location']
+
+                    try:
+                        state = old_dataset_row['state'].values[0]
+                    except KeyError:
+                        state = old_dataset_row['state']
+
+                    try:
+                        state_short = old_dataset_row['state_short'].values[0]
+                    except:
+                        state_short = old_dataset_row['state_short']
 
                     if location is not None:
                         writer.writerow([
@@ -87,10 +135,11 @@ def create_database(num_rows):
                             dic["duration"],
                             dic["speed"],
                             dic["expansion"],
-                            location.name,
-                            location.state,
-                            location.state_short,
-                            ''
+                            dic['direction_s'],
+                            dic['landcover_s'],
+                            location,
+                            state,
+                            state_short
                         ])
                         print('row {} written'.format(index))
                         index += 1

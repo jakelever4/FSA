@@ -22,11 +22,11 @@ import pickle
 pd.set_option("display.max_rows", None, "display.max_columns", None)
 df = pd.read_csv('datasets/AUS_Ignitions_2016.csv')
 # print(df.shape)
-
-
-# remove fires which have no tweets associated with them
-df = df[df.num_tweets != 0]
-# print(df.shape)
+#
+#
+# # remove fires which have no tweets associated with them
+# df = df[df.num_tweets != 0]
+# # print(df.shape)
 
 
 # data information
@@ -116,11 +116,11 @@ def create_random_forest_physical_regressor(target, df):
 
     regr.fit(X_train, y_train.ravel())
     score = regr.score(X_test, y_test)
-    print('R2 Score: {}%'.format(round((score) * 100), 4))
-    print(regr.get_params())
+    # print('R2 Score: {}%'.format(round((score) * 100), 4))
+    # print(regr.get_params())
 
     # print(regr.oob_prediction_)
-    print('OOB Score: {}%'.format(round((regr.oob_score_) * 100), 4))
+    # print('OOB Score: {}%'.format(round((regr.oob_score_) * 100), 4))
 
     y_pred = regr.predict(X_test)
 
@@ -132,8 +132,8 @@ def create_random_forest_physical_regressor(target, df):
     mse = metrics.mean_squared_error(y_test, y_pred)
     rmse = np.sqrt(mse)
 
-    print('MAE: {}'.format(mae))
-    print('MSE: {}'.format(mse))
+    # print('MAE: {}'.format(mae))
+    # print('MSE: {}'.format(mse))
     print('RMSE: {}'.format(rmse))
 
     print('')
@@ -144,7 +144,7 @@ def create_random_forest_physical_regressor(target, df):
     return regr
 
 
-def create_random_forest_sentiment_regressor(target):
+def create_random_forest_sentiment_regressor(target, df):
     target = [target]
     predictors = ['latitude', 'longitude', 'size', 'perimeter', 'duration', 'speed', 'expansion']
     df[predictors] = df[predictors] / df[predictors].max()
@@ -166,10 +166,10 @@ def create_random_forest_sentiment_regressor(target):
     regr.fit(X_train, y_train.ravel())
     score = regr.score(X_test, y_test)
     print('R2 Score: {}%'.format(round((score) * 100), 4))
-    print(regr.get_params())
+    # print(regr.get_params())
 
     # print(regr.oob_prediction_)
-    print('OOB Score: {}%'.format(round((regr.oob_score_) * 100), 4))
+    # print('OOB Score: {}%'.format(round((regr.oob_score_) * 100), 4))
 
 
     y_pred = regr.predict(X_test)
@@ -182,8 +182,8 @@ def create_random_forest_sentiment_regressor(target):
     mse = metrics.mean_squared_error(y_test,y_pred)
     rmse = np.sqrt(mse)
 
-    print('MAE: {}'.format(mae))
-    print('MSE: {}'.format(mse))
+    # print('MAE: {}'.format(mae))
+    # print('MSE: {}'.format(mse))
     print('RMSE: {}'.format(rmse))
 
     print('')
@@ -299,10 +299,10 @@ def calculate_distance_from_coordinate_estimate(lon_true, lat_true, lon_pred, la
 
 
 
-# Run random forest regression models on variables of the opposing type
-regressor = create_random_forest_sentiment_regressor('magnitude')
-regressor = create_random_forest_sentiment_regressor('sentiment')
-regressor = create_random_forest_sentiment_regressor('num_tweets')
+# # Run random forest regression models on variables of the opposing type
+regressor = create_random_forest_sentiment_regressor('magnitude', df)
+regressor = create_random_forest_sentiment_regressor('sentiment', df)
+regressor = create_random_forest_sentiment_regressor('num_tweets', df)
 
 # latitude_regressor = create_random_forest_location_regressor(df)
 regressor = create_random_forest_physical_regressor('longitude', df)

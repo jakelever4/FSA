@@ -1,6 +1,6 @@
 from google.cloud import language_v1
-from google.cloud.language_v1 import enums
 from google.oauth2 import service_account
+import Entity
 
 # set google application credentials
 credentials = service_account.Credentials.from_service_account_file("fire-sentiment-analysis-bf24604da498.json")
@@ -10,21 +10,21 @@ def analyze_entities(text_content):
     client = language_v1.LanguageServiceClient(credentials=credentials)
 
     # Available types: PLAIN_TEXT, HTML
-    type_ = enums.Document.Type.PLAIN_TEXT
+    type_ = language_v1.Document.Type.PLAIN_TEXT
 
-    document = {"content": text_content, "type": type_}
+    document = {"content": text_content, "type_": type_}
 
     # Available values: NONE, UTF8, UTF16, UTF32
-    encoding_type = enums.EncodingType.UTF8
+    encoding_type = language_v1.EncodingType.UTF8
 
-    response = client.analyze_entities(document, encoding_type=encoding_type)
+    response = client.analyze_entities(request={'document': document, 'encoding_type': encoding_type})
 
     entities = []
 
     # Loop through entitites returned from the API
     for entity in response.entities:
         name = entity.name
-        type = enums.Entity.Type(entity.type)
+        type = language_v1.Entity.Type(entity.type_).name
         salience = entity.salience
         metadata_dict = {}
         mentions = []
@@ -34,12 +34,12 @@ def analyze_entities(text_content):
             metadata_dict.update(data)
 
         for mention in entity.mentions:
-            entity_mention = Entity.Entity_Mention(mention.text.content, enums.EntityMention.Type(mention.type).name)
+            entity_mention = Entity.Entitiy_Mention(mention.text.content, language_v1.EntityMention.Type(mention.type_).name)
             mentions.append(entity_mention)
 
         entity_obj = Entity.Entity(name, type, salience, metadata_dict, mentions)
         entities.append(entity_obj)
 
-        # print(entity_obj)
+        print(entity_obj)
 
     return entities

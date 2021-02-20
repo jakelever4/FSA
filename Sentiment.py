@@ -1,6 +1,8 @@
 class Overall_Sentiment:
-    def __init__(self, score, magnitude, sentences):
+    def __init__(self, score, overall_positive_sentiment, overall_negative_sentiment, magnitude, sentences):
         self.score = score
+        self.overall_positive_sentiment = overall_positive_sentiment
+        self.overall_negative_sentiment = overall_negative_sentiment
         self.magnitude = magnitude
         self.sentences = sentences
 
