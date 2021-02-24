@@ -27,8 +27,8 @@ def connect_to_endpoint(url, headers, query_params):
 
     if status_code == 429:
         while status_code == 429:
-            print('429 Twitter exception: too many requests. Waiting 1 min and retrying')
-            time.sleep(60)
+            print('429 Twitter exception: too many requests. Waiting 10 secs and retrying')
+            time.sleep(10)
             response = requests.request("GET", url, headers=headers, params=query_params)
             status_code = response.status_code
             print(status_code)

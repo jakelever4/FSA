@@ -213,19 +213,19 @@ def save_tweets_to_db(tweets, fire_row_id, conn):
         tweet_row_id = SQLite.create_tweet(conn,tweet_row)
 
         if tweet.entities is not None:
-            save_entities_to_db(tweet.entities, tweet_row_id)
+            save_entities_to_db(tweet.entities, int(tweet.tweet_id))
     print('Tweets for fire_ID {} successfully saved to databse.'.format(fire_row_id))
     return None
 
 
-def save_entities_to_db(entities, tweet_row_id):
+def save_entities_to_db(entities, tweet_id):
     try:
         hashtags = json.dumps(entities.hashtags[0])
         urls = json.dumps(entities.urls[0])
-        entity_row = (tweet_row_id, hashtags, urls)
+        entity_row = (tweet_id, hashtags, urls)
         SQLite.create_entity(conn, entity_row)
     except:
-        raise Exception('Couldnt save entities to db for tweet id {}'.format(tweet_row_id))
+        raise Exception('Couldnt save entities to db for tweet id {}'.format(tweet_id))
 
 
 def save_fire_to_db(fire, conn):
@@ -248,44 +248,44 @@ with open("datasets/V4_Ignitions_2016_I.csv", 'r') as dataset_incomplete:
     reader = csv.reader(dataset_incomplete, delimiter=',')
 
     # WRITE HEADER
-    with open('datasets/V4_Ignitions_2016.csv', 'w') as dataset:
-        writer = csv.writer(dataset, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        writer.writerow(['fire_ID',
-                         'latitude',
-                         'longitude',
-                         'size',
-                         'perimeter',
-                         'start_date',
-                         'end_date',
-                         'duration',
-                         'speed',
-                         'expansion',
-                         'direction',
-                         'landcover',
-                         'location',
-                         'state',
-                         'state_short',
-                         'pop_density',
-                         # 'cloud_cover',
-                         # 'humidity',
-                         # 'precip_intensity',
-                         # 'precip_prob',
-                         # 'pressure',
-                         # 'max_temp',
-                         # 'uv_index',
-                         # 'wind_bearing',
-                         # 'wind_speed',
-                         'sentiment',
-                         'overall_sentiment',
-                         'overall_positive_sentiment',
-                         'overall_negative_sentiment',
-                         'magnitude',
-                         'overall_magnitude',
-                         'num_tweets',
-                         'total_tweets'
-                        ])
+    # with open('datasets/V4_Ignitions_2016.csv', 'w') as dataset:
+    #     writer = csv.writer(dataset, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    #     writer.writerow(['fire_ID',
+    #                      'latitude',
+    #                      'longitude',
+    #                      'size',
+    #                      'perimeter',
+    #                      'start_date',
+    #                      'end_date',
+    #                      'duration',
+    #                      'speed',
+    #                      'expansion',
+    #                      'direction',
+    #                      'landcover',
+    #                      'location',
+    #                      'state',
+    #                      'state_short',
+    #                      'pop_density',
+    #                      # 'cloud_cover',
+    #                      # 'humidity',
+    #                      # 'precip_intensity',
+    #                      # 'precip_prob',
+    #                      # 'pressure',
+    #                      # 'max_temp',
+    #                      # 'uv_index',
+    #                      # 'wind_bearing',
+    #                      # 'wind_speed',
+    #                      'sentiment',
+    #                      'overall_sentiment',
+    #                      'overall_positive_sentiment',
+    #                      'overall_negative_sentiment',
+    #                      'magnitude',
+    #                      'overall_magnitude',
+    #                      'num_tweets',
+    #                      'total_tweets'
+    #                     ])
 
-    database = 'test.db'
+    database = 'database.db'
     # create a database connection
     conn = SQLite.create_connection(database)
 
@@ -293,7 +293,8 @@ with open("datasets/V4_Ignitions_2016_I.csv", 'r') as dataset_incomplete:
         SQLite.create_tables(conn)
         for row in reader:
             # IF ROW IS NOT ANALYSED YET THEN ANALYSE
-            if check_sentiment_column(row) and int(row[0]) >= 0: # 866562:
+            # TODO: CHNAGE ROW ID HERE IF PARTIALLY ANALYSED
+            if check_sentiment_column(row) and int(row[0]) > 21096: # 21096:
 
                 # GET START, END DATES, LOCATION WORDS AND GENERATE QUERY
                 start_date, end_date = get_start_end_dates(row)
@@ -311,10 +312,6 @@ with open("datasets/V4_Ignitions_2016_I.csv", 'r') as dataset_incomplete:
 
                 # GET TWEETS FOR FIRE
                 while True:
-
-                    # tweets = get_tweets(start_date, end_date, query, row[0])
-                    # tweets = remove_filters(tweets, filters)
-                    # num_tweets = len(tweets)
 
                     try:
                         tweets = get_tweets(start_date, end_date, query, row[0])
@@ -358,17 +355,17 @@ with open("datasets/V4_Ignitions_2016_I.csv", 'r') as dataset_incomplete:
                     # for x in weather_vector:
                     #     print(x)
 
-                    fig, (ax1, ax2) = plt.subplots(2)
-                    fig.suptitle('fire ID: {} over burn period ({} to {})'.format(row[0], start_date, end_date))
-                    ax1.set_title('SUM(Sentiment)')
-                    ax2.set_title('SUM(Magnitude)')
-                    ax2.plot(unique_days, magnitude_vector, color='g')
-
-                    ax1.plot(unique_days, sentiment_vector, color='b')
-                    ax1.bar(unique_days, positive_sentiment_vector, color='g')
-                    ax1.bar(unique_days, negative_sentiment_vector, color='r')
-
-                    plt.show()
+                    # fig, (ax1, ax2) = plt.subplots(2)
+                    # fig.suptitle('fire ID: {} over burn period ({} to {})'.format(row[0], start_date, end_date))
+                    # ax1.set_title('SUM(Sentiment)')
+                    # ax2.set_title('SUM(Magnitude)')
+                    # ax2.plot(unique_days, magnitude_vector, color='g')
+                    #
+                    # ax1.plot(unique_days, sentiment_vector, color='b')
+                    # ax1.bar(unique_days, positive_sentiment_vector, color='g')
+                    # ax1.bar(unique_days, negative_sentiment_vector, color='r')
+                    #
+                    # plt.show()
 
                     # Sum social metrics
                     total_sentiment = sum(sentiment_vector)
@@ -390,12 +387,12 @@ with open("datasets/V4_Ignitions_2016_I.csv", 'r') as dataset_incomplete:
 
                     #SAVE TWEETS, FIRE IN DATABASE
                     fire_row_id = save_fire_to_db(row, conn)
-                    save_tweets_to_db(tweets, fire_row_id, conn)
+                    save_tweets_to_db(tweets, row[0], conn)
 
                     # SAVE FIRE DATA TO CSV
-                    with open('datasets/V4_Ignitions_2016.csv', 'a') as dataset:
-                        writer = csv.writer(dataset, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-                        writer.writerow(row)
+                    # with open('datasets/V4_Ignitions_2016.csv', 'a') as dataset:
+                    #     writer = csv.writer(dataset, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+                    #     writer.writerow(row)
 
                     print('row ID {} saved'.format(row[0]))
 

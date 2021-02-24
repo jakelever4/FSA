@@ -3,6 +3,29 @@ import Sentiment
 from google.api_core import exceptions
 
 
+def split_text_context(text_content, n_splits):
+    score = 0
+    pos_sentiment = 0
+    neg_sentiment = 0
+    magnitude = 0
+
+    text_content = text_content.split('.')
+    split_list = split(text_content, n_splits)
+    for list in split_list:
+        string = ''
+        for item in list:
+            string += item
+
+        sentiment = analyze(string)
+        score += sentiment.score
+        pos_sentiment += sentiment.overall_positive_sentiment
+        neg_sentiment += sentiment.overall_negative_sentiment
+        magnitude += sentiment.magnitude
+
+    sent = Sentiment.Overall_Sentiment(score, pos_sentiment, neg_sentiment, magnitude, None)
+    return sent
+
+
 def analyze(text_content):
     client = language_v1.LanguageServiceClient.from_service_account_json("fire-sentiment-analysis-bf24604da498.json")
 
@@ -12,12 +35,24 @@ def analyze(text_content):
     # Available values: NONE, UTF8, UTF16, UTF32
     encoding_type = language_v1.EncodingType.UTF8
 
+    # response = client.analyze_sentiment(request={'document': document, 'encoding_type': encoding_type})
     try:
+        # try to get a response
         response = client.analyze_sentiment(request={'document': document, 'encoding_type': encoding_type})
-    except exceptions.InvalidArgument:
-        raise Exception(response)
+    except exceptions.InvalidArgument as e:
+        # if there is an invalid exception
+        print('google.api_core.exceptions.InvalidArgument: 400')
+        print(e.message)
+        # check if document size is big (140,000 = 1,000 x 140 char tweets for a day) split document into 10 slices
+        if len(text_content) > 140000:
+            print('DOCUMENT TOO BIG. PERFORMING SLICING')
+            sent = split_text_context(text_content, 10)
+        else:
+            print('doc size normal, other invalid argument')
+            sent = Sentiment.Overall_Sentiment(0, 0, 0, 0, None)
 
-    # Print the results
+        return sent
+
     # Score is the overall emotional learning of the text
     # Magnitude indicates the overall strength of the emotion.
     #print_result(response)
@@ -45,6 +80,11 @@ def analyze(text_content):
     print("Overall Sentiment: score of {} with magnitude of {}".format(overall_sent, overall_mag))
 
     return sentimemt
+
+
+def split(a, n):
+    k, m = divmod(len(a), n)
+    return list(a[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n))
 
 
 def print_result(annotations):

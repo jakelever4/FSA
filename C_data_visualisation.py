@@ -8,7 +8,7 @@ import seaborn as sns
 
 
 pd.set_option("display.max_rows", None, "display.max_columns", None)
-# df = pd.read_csv('datasets/AUS_ignitions_2016.csv')
+df = pd.read_csv('datasets/AUS_ignitions_2016.csv')
 # dfi = pd.read_csv('datasets/AUS_ignitions_2016_I.csv')
 
 

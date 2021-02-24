@@ -56,6 +56,23 @@ def create_fire(conn, fire):
     return cur.lastrowid
 
 
+def update_fire(conn, fire):
+    """
+    update priority fire
+    :param conn:
+    :param fire:
+    :return: fire_ID
+    """
+    sql = ''' UPDATE fires
+              SET priority = ? ,
+                  begin_date = ? ,
+                  end_date = ?
+              WHERE id = ?'''
+    cur = conn.cursor()
+    cur.execute(sql, fire)
+    conn.commit()
+
+
 def create_tweet(conn, tweet):
     """
     Create a new task
@@ -179,17 +196,18 @@ def select_all_tweets(conn):
     return df
 
 
-def execute_query(query, conn, table=None):
+def execute_query(query, conn, table=None, cols=None):
     cur = conn.cursor()
     cur.execute(query)
     rows = cur.fetchall()
 
-    if table == 'fires':
-        cols = fire_columns
-    elif table == 'tweets':
-        cols = tweet_columns
-    else:
-        cols = None
+    if cols is None:
+        if table == 'fires':
+            cols = fire_columns
+        elif table == 'tweets':
+            cols = tweet_columns
+        else:
+            cols = None
 
     df = pd.DataFrame(rows, columns=cols)
 
@@ -227,7 +245,5 @@ def string_to_float_array(series):
         column.append(lst_fl)
 
     return column
-
-
 
 
