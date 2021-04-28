@@ -2,13 +2,12 @@ import sqlite3
 from sqlite3 import Error
 import pandas as pd
 
+fire_columns = ['fire_ID', 'latitude', 'longitude', 'size', 'perimeter', 'start_date', 'end_date', 'duration',
+                'speed', 'expansion', 'direction', 'landcover', 'location', 'state', 'state_short', 'pop_density',
+                'sentiment', 'overall_sentiment', 'overall_positive_sentiment', 'overall_negative_sentiment',
+                'magnitude', 'overall_magnitude', 'num_tweets', 'total_tweets']
 
-fire_columns = ['fire_ID','latitude','longitude','size','perimeter','start_date','end_date','duration',
-                 'speed','expansion', 'direction', 'landcover', 'location', 'state', 'state_short', 'pop_density',
-                 'sentiment', 'overall_sentiment', 'overall_positive_sentiment', 'overall_negative_sentiment',
-                 'magnitude','overall_magnitude','num_tweets','total_tweets']
-
-tweet_columns = ['tweet_ID','fire_ID','full_text','date', 'author_ID']
+tweet_columns = ['tweet_ID', 'fire_ID', 'full_text', 'date', 'author_ID']
 
 
 def create_connection(db_file):
@@ -27,11 +26,6 @@ def create_connection(db_file):
 
 
 def create_table(conn, create_table_sql):
-    """ create a table from the create_table_sql statement
-    :param conn: Connection object
-    :param create_table_sql: a CREATE TABLE statement
-    :return:
-    """
     try:
         c = conn.cursor()
         c.execute(create_table_sql)
@@ -40,12 +34,6 @@ def create_table(conn, create_table_sql):
 
 
 def create_fire(conn, fire):
-    """
-    Create a new project into the projects table
-    :param conn:
-    :param project:
-    :return: project id
-    """
     sql = ''' INSERT INTO fires(fire_ID,latitude,longitude,size,perimeter,start_date,end_date,duration,speed,expansion,
     direction,landcover,location,state,state_short,pop_density,sentiment,overall_sentiment,overall_positive_sentiment,
     overall_negative_sentiment,magnitude,overall_magnitude,num_tweets,total_tweets)
@@ -57,12 +45,6 @@ def create_fire(conn, fire):
 
 
 def update_fire(conn, fire):
-    """
-    update priority fire
-    :param conn:
-    :param fire:
-    :return: fire_ID
-    """
     sql = ''' UPDATE fires
               SET priority = ? ,
                   begin_date = ? ,
@@ -106,7 +88,6 @@ def create_entity(conn, entity):
 
 
 def create_tables(conn):
-
     sql_create_fires_table = """ CREATE TABLE IF NOT EXISTS fires (
                                         fire_ID integer,
                                         latitude real,
@@ -161,7 +142,6 @@ def create_tables(conn):
         create_table(conn, sql_create_entities_table)
     else:
         print("Error! cannot create the database connection.")
-
 
 
 def select_all_fires(conn):
@@ -241,9 +221,7 @@ def string_to_float_array(series):
             str = str[:-1]
 
         lst = str.split()
-        lst_fl = [float(x.replace(',','')) for x in lst]
+        lst_fl = [float(x.replace(',', '')) for x in lst]
         column.append(lst_fl)
 
     return column
-
-

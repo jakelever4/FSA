@@ -101,3 +101,8 @@ def print_result(annotations):
         "Overall Sentiment: score of {} with magnitude of {}".format(score, magnitude)
     )
     return 0
+
+
+analysis = analyze('Fires rage across California in this stunning time-lapse')
+# Record heat sparks warnings, boosts fires in western United States: score; 0.1, mag: 0.1
+print(analysis)

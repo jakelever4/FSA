@@ -8,16 +8,11 @@ import seaborn as sns
 
 
 pd.set_option("display.max_rows", None, "display.max_columns", None)
-df = pd.read_csv('datasets/AUS_ignitions_2016.csv')
+df = pd.read_csv('fires_df.csv', error_bad_lines=False)
 # dfi = pd.read_csv('datasets/AUS_ignitions_2016_I.csv')
 
-
-
-x = pd.read_csv('datasets/NA_ignitions_2016.csv', error_bad_lines=False)
-hist = x.hist(column='duration', bins=50)
-# hist.show()
-# print(df.shape)
-
+df['s'] = df['overall_sentiment'] / df['total_tweets']
+df['m'] = df['overall_magnitude'] / df['total_tweets']
 
 # remove fires which have no tweets associated with them
 df = df[df.num_tweets != 0]
@@ -36,7 +31,7 @@ cb = plt.colorbar()
 cb.ax.tick_params(labelsize=14)
 plt.title('Correlation Matrix', fontsize=16)
 
-plt.savefig('graphs/AUS_Corelation_matrix.png')
+plt.savefig('graphs/V4_Corelation_matrix.png')
 plt.show()
 
 
@@ -46,52 +41,56 @@ scatter_matrix(df, alpha=0.2)
 
 # data visualisation
 geometry = [Point(xy) for xy in zip( df['longitude'], df['latitude'])]
-geometryi = [Point(xy) for xy in zip( dfi['longitude'], dfi['latitude'])]
+# geometryi = [Point(xy) for xy in zip( dfi['longitude'], dfi['latitude'])]
 
 geo_df = gpd.GeoDataFrame(df, crs=crs, geometry=geometry)
-geo_dfi = gpd.GeoDataFrame(dfi, crs=crs, geometry=geometryi)
+# geo_dfi = gpd.GeoDataFrame(dfi, crs=crs, geometry=geometryi)
 
 
-aus_map = gpd.read_file('nsaasr9nnd_02211a04es_geo___/aust_cd66states.shp')
+na_map = gpd.read_file('USA_Canada_ShapefileMerge/USA_Canada_ShapefileMerge.shp')
 
 
-# Plotted ALL fires
-fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,8))
-aus_map.plot(ax=ax, color='grey')
-geo_dfi.plot(ax =ax, markersize=5, marker='.')
-plt.title('All Austrailian Fires in Global Fire Atlas Scope')
-plt.xlabel('Lon')
-plt.ylabel('Lat')
-
-plt.savefig('graphs/AUS_Scope.png')
-plt.show()
+# # Plotted ALL fires
+# fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,8))
+# na_map.plot(ax=ax, color='grey')
+# # geo_dfi.plot(ax =ax, markersize=5, marker='.')
+# plt.title('All Austrailian Fires in Global Fire Atlas Scope')
+# plt.xlabel('Lon')
+# plt.ylabel('Lat')
+#
+# plt.savefig('graphs/AUS_Scope.png')
+# plt.show()
 
 
 # PLOTTED FIRE MAP WITH SENTIMENT COLOR
 fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,8))
-aus_map.plot(ax=ax, alpha=0.8, color='grey')
-geo_df.plot(column='sentiment', ax =ax, markersize=5, marker='.', label='Sentiment Score', legend=True)
+na_map.plot(ax=ax, alpha=0.8, color='grey')
+geo_df.plot(column='s', ax =ax, markersize=5, marker='.', label='Avg Sentiment Score', legend=True)
 # ax.set_aspect('auto')
+ax.set_xlim([-180, -55])
+ax.set_ylim([20,80])
 plt.legend(prop={'size': 10}, loc='lower left')
-plt.title('Austrailian Fires Coloured by Sentiment Score')
+plt.title('North American Fires Coloured by Average Sentiment Score')
 plt.xlabel('Lon')
 plt.ylabel('Lat')
 
-plt.savefig('graphs/AUS_Fires_Map_Sentiment.png')
+plt.savefig('graphs/V4_Fires_Map_Sentiment.png')
 plt.show()
 
 
 # PLOTTED FIRE MAP WITH MAGNITUDE COLOR
 fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,8))
-aus_map.plot(ax=ax, alpha=0.8, color='grey')
-geo_df.plot(column='magnitude', ax =ax, markersize=5, marker='.', label='Magnitude Score', legend=True)
+na_map.plot(ax=ax, alpha=0.8, color='grey')
+geo_df.plot(column='m', ax =ax, markersize=5, marker='.', label='Avg Magnitude Score', legend=True)
 # ax.set_aspect('auto')
+ax.set_xlim([-180, -55])
+ax.set_ylim([20,80])
 plt.legend(prop={'size': 10}, loc='lower left')
-plt.title('Austrailian Fires Coloured by Magnitude Score')
+plt.title('North American Fires Coloured by Average Magnitude Score')
 plt.xlabel('Lon')
 plt.ylabel('Lat')
 
-plt.savefig('graphs/AUS_Fires_Map_Magnitude.png')
+plt.savefig('graphs/V4_Fires_Map_Magnitude.png')
 plt.show()
 
 

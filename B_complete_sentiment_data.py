@@ -285,7 +285,7 @@ with open("datasets/V4_Ignitions_2016_I.csv", 'r') as dataset_incomplete:
     #                      'total_tweets'
     #                     ])
 
-    database = 'database.db'
+    database = 'test.db'
     # create a database connection
     conn = SQLite.create_connection(database)
 
@@ -294,7 +294,7 @@ with open("datasets/V4_Ignitions_2016_I.csv", 'r') as dataset_incomplete:
         for row in reader:
             # IF ROW IS NOT ANALYSED YET THEN ANALYSE
             # TODO: CHNAGE ROW ID HERE IF PARTIALLY ANALYSED
-            if check_sentiment_column(row) and int(row[0]) > 21096: # 21096:
+            if check_sentiment_column(row) and int(row[0]) > 0: # 21096:
 
                 # GET START, END DATES, LOCATION WORDS AND GENERATE QUERY
                 start_date, end_date = get_start_end_dates(row)
@@ -386,8 +386,8 @@ with open("datasets/V4_Ignitions_2016_I.csv", 'r') as dataset_incomplete:
                     print(row)
 
                     #SAVE TWEETS, FIRE IN DATABASE
-                    fire_row_id = save_fire_to_db(row, conn)
-                    save_tweets_to_db(tweets, row[0], conn)
+                    # fire_row_id = save_fire_to_db(row, conn)
+                    # save_tweets_to_db(tweets, row[0], conn)
 
                     # SAVE FIRE DATA TO CSV
                     # with open('datasets/V4_Ignitions_2016.csv', 'a') as dataset:
