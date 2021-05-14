@@ -39,47 +39,54 @@ def analyze(text_content):
     try:
         # try to get a response
         response = client.analyze_sentiment(request={'document': document, 'encoding_type': encoding_type})
-    except exceptions.InvalidArgument as e:
-        # if there is an invalid exception
-        print('google.api_core.exceptions.InvalidArgument: 400')
-        print(e.message)
-        # check if document size is big (140,000 = 1,000 x 140 char tweets for a day) split document into 10 slices
-        if len(text_content) > 140000:
-            print('DOCUMENT TOO BIG. PERFORMING SLICING')
-            sent = split_text_context(text_content, 10)
-        else:
-            print('doc size normal, other invalid argument')
-            sent = Sentiment.Overall_Sentiment(0, 0, 0, 0, None)
 
-        return sent
+        # Score is the overall emotional learning of the text
+        # Magnitude indicates the overall strength of the emotion.
+        #print_result(response)
 
-    # Score is the overall emotional learning of the text
-    # Magnitude indicates the overall strength of the emotion.
-    #print_result(response)
+        score = response.document_sentiment.score
+        magnitude = response.document_sentiment.magnitude
+        sentences = []
+        for index, sentence in enumerate(response.sentences):
+            text = sentence.text.content
+            sentence_sentiment = Sentiment.Sentence_Sentiment(index, sentence.sentiment.score, sentence.sentiment.magnitude, text)
+            sentences.append(sentence_sentiment)
 
-    score = response.document_sentiment.score
-    magnitude = response.document_sentiment.magnitude
-    sentences = []
-    for index, sentence in enumerate(response.sentences):
-        sentence_sentiment = Sentiment.Sentence_Sentiment(index, sentence.sentiment.score, sentence.sentiment.magnitude)
-        sentences.append(sentence_sentiment)
+        sentimemt = Sentiment.Overall_Sentiment(score, magnitude, sentences)
+        print("Overall Sentiment: score of {} with magnitude of {}".format(score, magnitude))
 
-    overall_sent = 0
-    overall_mag = 0
-    overall_positive_sentiment = 0
-    overall_negative_sentiment = 0
-    for sentence in sentences:
-        overall_sent += sentence.score
-        if sentence.score <= 0:
-            overall_negative_sentiment += sentence.score
-        else:
-            overall_positive_sentiment += sentence.score
-        overall_mag += sentence.magnitude
+        return sentimemt
 
-    sentimemt = Sentiment.Overall_Sentiment(overall_sent, overall_positive_sentiment, overall_negative_sentiment, overall_mag, sentences)
-    print("Overall Sentiment: score of {} with magnitude of {}".format(overall_sent, overall_mag))
+    except:
+        print('ERROR ANALYSING SENTIMENT. RETRYING')
+        try:
+            split_text = split(text_content, 5)
+            sentences = []
+            scores = []
+            mags = []
+            for text in split_text:
+                document = {"content": text, "type_": type_}
+                response = client.analyze_sentiment(request={'document': document, 'encoding_type': encoding_type})
 
-    return sentimemt
+                scores.append(response.document_sentiment.score)
+                mags.append(response.document_sentiment.magnitude)
+                for index, sentence in enumerate(response.sentences):
+                    text = sentence.text.content
+                    sentence_sentiment = Sentiment.Sentence_Sentiment(index, sentence.sentiment.score, sentence.sentiment.magnitude, text)
+                    sentences.append(sentence_sentiment)
+
+            magnitude = sum(mags) / len(mags)
+            sentiment = sum(scores) / len(scores)
+
+            sentimemt = Sentiment.Overall_Sentiment(sentiment, magnitude, sentences)
+            print("Overall Sentiment: score of {} with magnitude of {}".format(sentiment, magnitude))
+
+            return sentimemt
+        except:
+            sentimemt = Sentiment.Overall_Sentiment(0, 0, [])
+            return sentimemt
+
+
 
 
 def split(a, n):
@@ -103,6 +110,17 @@ def print_result(annotations):
     return 0
 
 
-analysis = analyze('Fires rage across California in this stunning time-lapse')
+# analysis = analyze('Fires rage across California in this stunning time-lapse')
 # Record heat sparks warnings, boosts fires in western United States: score; 0.1, mag: 0.1
-print(analysis)
+# print(analysis)
+# overall_sent = 0
+# overall_mag = 0
+# overall_positive_sentiment = 0
+# overall_negative_sentiment = 0
+# for sentence in sentences:
+#     overall_sent += sentence.score
+#     if sentence.score <= 0:
+#         overall_negative_sentiment += sentence.score
+#     else:
+#         overall_positive_sentiment += sentence.score
+#     overall_mag += sentence.magnitude

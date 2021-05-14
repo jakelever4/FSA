@@ -4,10 +4,10 @@ import pandas as pd
 
 fire_columns = ['fire_ID', 'latitude', 'longitude', 'size', 'perimeter', 'start_date', 'end_date', 'duration',
                 'speed', 'expansion', 'direction', 'landcover', 'location', 'state', 'state_short', 'pop_density',
-                'sentiment', 'overall_sentiment', 'overall_positive_sentiment', 'overall_negative_sentiment',
-                'magnitude', 'overall_magnitude', 'num_tweets', 'total_tweets']
+                'sentiment', 'magnitude', 'num_tweets']
 
-tweet_columns = ['tweet_ID', 'fire_ID', 'full_text', 'date', 'author_ID']
+tweet_columns = ['tweet_ID', 'fire_ID', 'full_text', 'date', 'dtime', 'author_ID', 'author_name', 'author_username',
+                 'rt_count', 'sentiment', 'magnitude']
 
 
 def create_connection(db_file):
@@ -35,9 +35,8 @@ def create_table(conn, create_table_sql):
 
 def create_fire(conn, fire):
     sql = ''' INSERT INTO fires(fire_ID,latitude,longitude,size,perimeter,start_date,end_date,duration,speed,expansion,
-    direction,landcover,location,state,state_short,pop_density,sentiment,overall_sentiment,overall_positive_sentiment,
-    overall_negative_sentiment,magnitude,overall_magnitude,num_tweets,total_tweets)
-              VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) '''
+    direction,landcover,location,state,state_short,pop_density,sentiment,magnitude,num_tweets)
+              VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) '''
     cur = conn.cursor()
     cur.execute(sql, fire)
     conn.commit()
@@ -63,8 +62,8 @@ def create_tweet(conn, tweet):
     :return:
     """
 
-    sql = ''' INSERT INTO tweets(tweet_ID,fire_ID,full_text,date,author_ID)
-              VALUES(?,?,?,?,?) '''
+    sql = ''' INSERT INTO tweets(tweet_ID,fire_ID,full_text,date,dtime,author_ID,author_name,author_username,rt_count,sentiment,magnitude)
+              VALUES(?,?,?,?,?,?,?,?,?,?,?) '''
     cur = conn.cursor()
     cur.execute(sql, tweet)
     conn.commit()
@@ -105,14 +104,9 @@ def create_tables(conn):
                                         state text,
                                         state_short text,
                                         pop_density real,
-                                        sentiment text,
-                                        overall_sentiment real,
-                                        overall_positive_sentiment text,
-                                        overall_negative_sentiment text,
-                                        magnitude text,
-                                        overall_magnitude real,
-                                        num_tweets text,
-                                        total_tweets int
+                                        sentiment real,
+                                        magnitude real,
+                                        num_tweets int
                                     ); """
 
     sql_create_tweets_table = """CREATE TABLE IF NOT EXISTS tweets (
@@ -120,7 +114,13 @@ def create_tables(conn):
                                     fire_ID integer,
                                     full_text text,
                                     date text,
+                                    dtime text,
                                     author_ID int,
+                                    author_name text,
+                                    author_username text,
+                                    rt_count int,
+                                    sentiment real,
+                                    magnitude real,
                                     FOREIGN KEY(fire_ID) REFERENCES fires(fire_ID)
                                 );"""
 
@@ -155,8 +155,6 @@ def select_all_fires(conn):
     rows = cur.fetchall()
 
     df = pd.DataFrame(rows, columns=fire_columns)
-    df = convert_fire_rows(df)
-
     return df
 
 
@@ -190,16 +188,6 @@ def execute_query(query, conn, table=None, cols=None):
             cols = None
 
     df = pd.DataFrame(rows, columns=cols)
-
-    return df
-
-
-def convert_fire_rows(df):
-    df['sentiment'] = string_to_float_array(df['sentiment'])
-    df['overall_positive_sentiment'] = string_to_float_array(df['overall_positive_sentiment'])
-    df['overall_negative_sentiment'] = string_to_float_array(df['overall_negative_sentiment'])
-    df['magnitude'] = string_to_float_array(df['magnitude'])
-    df['num_tweets'] = string_to_float_array(df['num_tweets'])
 
     return df
 

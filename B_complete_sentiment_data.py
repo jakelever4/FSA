@@ -10,26 +10,35 @@ import matplotlib.pyplot as plt
 import SQLite
 import entity_obj
 import json
+from dateutil.parser import parse
+import re
+from fuzzywuzzy import fuzz
+from fuzzywuzzy import process
 
 wpop_density = np.loadtxt('gpw-v4-population-density-adjusted-to-2015-unwpp-country-totals-rev11_2015_15_min_asc/gpw_v4_population_density_adjusted_to_2015_unwpp_country_totals_rev11_2015_15_min.asc', skiprows=6)
 
 filters = ['like wildfire', 'feel the burn']
-days_lag_pre = 1
-days_lag_post = 1
+days_lag_pre = 3
+days_lag_post = 3
 
 
 def get_queries_from_location(state, country, location_list):
     state_list = location_list[0].split()
     for value in state_list:
         # value = value.strip()
-        if value != 'county' and value != 'County' and value != 'HI' and value != 'OR':
+        if value != 'county' and value != 'County' and value != 'HI' and value != 'OR' and value != 'no.'  \
+                and value != 'No'  and value != 'No.' and value != 'no':
             location_list.append(value)
 
-    filt = ''
-    for value in filters:
-        filt += ' -' + value
+    # filt = ''
+    # for value in filters:
+    #     filt += ' -' + value
+    #
+    # print(filt)
 
-    print(filt)
+    for loc in location_list:
+        if loc.strip() == 'USA' or loc.strip() =='Canada':
+            location_list.remove(loc)
 
     location_list.append(state)
     hashtags = ''
@@ -51,7 +60,7 @@ def get_queries_from_location(state, country, location_list):
             else:
                 location_keywords += loc
 
-    query = location_keywords + fire_keywords + hashtags
+    query = location_keywords + fire_keywords + hashtags + ' -is:retweet -is:quote'
     print(query)
 
     return query
@@ -108,83 +117,97 @@ def lookup_density(coords):
     return density
 
 
+def get_user_from_id(author_id, users):
+    for user in users:
+        user_id = user['id']
+        if user_id == author_id:
+            return user['name'], user['username']
+    print('Username Not Found')
+    return 'NA', 'NA'
+
+
 def get_tweets(start_date, end_date, query, fire_ID):
     # Get tweets for particular query
     results, next_token = TwitterAPI.full_archive_search(query, start_date, end_date, next_token=None)
-    all_results = [results]
+    user_expansions = []
+    try:
+        all_results = results['data']
+        user_expansions += results['includes']['users']
+    except KeyError:
+        print('no tweets found for fire')
+        return []
+
 
     # Check the next token to see if there is another page of results to get
     while next_token is not None:
         new_results, next_token = TwitterAPI.full_archive_search(query,start_date,end_date, next_token=next_token)
-        all_results.append(new_results)
+        all_results += new_results['data']
+        user_expansions += new_results['includes']['users']
 
     # save results in tweet object list
     tweets = []
-    for result_list in all_results:
-        for tweet in result_list['data']:
-            try:
-                date = tweet['created_at'][:10]
-                try:
-                    entities = entity_obj.save_entities(tweet['id'], tweet['entities'])
-                except KeyError:
-                    entities = None
+    no_user_found = 0
+    num_res = len(all_results)
+    for tweet in all_results:
+        if 'referenced_tweets' in tweet:
+            # ignore retweets
+            # print('referenced tweet found. Type: {}'.format(tweet['referenced_tweets'][0]['type']))
+            # print(tweet['text'])
+            continue
 
-                tweet_o = tweet_obj.tweet_obj(tweet['id'], fire_ID, tweet['text'], date, tweet['author_id'], entities)
-                tweets.append(tweet_o)
-            except KeyError:
-                print('Cannot find fields for tweet {}.'.format(tweet['id']))
+        dtime = parse(tweet['created_at'])
+        date = dtime.date()
+        author_name, author_username = get_user_from_id(tweet['author_id'], user_expansions)
+        if author_name == 'NA' and author_username == 'NA':
+            no_user_found += 1
+        try:
+            entities = entity_obj.save_entities(tweet['id'], tweet['entities'])
+        except KeyError:
+            entities = None
+        rt_count = tweet['public_metrics']['retweet_count'] + tweet['public_metrics']['quote_count']
+        tweet_text_no_url = re.sub(r'\w+:\/{2}[\d\w-]+(\.[\d\w-]+)*(?:(?:\/[^\s/]*))*', '', tweet['text'])
 
+        tweet_o = tweet_obj.tweet_obj(tweet['id'], fire_ID, tweet_text_no_url, date, dtime, tweet['author_id'],
+                                      author_name, author_username, entities, rt_count)
+        tweets.append(tweet_o)
+
+    print('for {} results, couldnt match users for {}'.format(num_res, no_user_found))
     return tweets
 
 
-def group_tweet_texts(binned_daily_tweets):
-    daily_text = []
-    for daily_tweets in binned_daily_tweets:
-        days_tweet_text = ''
+def remove_special_chars(text):
+    tweet_text = text.strip()
+    tweet_text = re.sub(r"[^a-zA-Z0-9]+", ' ', tweet_text)
+    sentence = tweet_text.replace('…', ' ').replace('...', ' ').replace('.', ',').replace('!', ' ') \
+        .replace('?', ',').replace('\n', ' ').replace('|', ',').replace('"', "'")
 
-        for text in daily_tweets:
-            if text[-1] != '.':
-                text += '. '
+    try:
+        if sentence[0].isdigit():
+            sentence = "A " + sentence
+        if sentence[-1] == ',':
+            sentence = sentence[:-1] + '. \n'
+            # sentence[-1] = '. '
+        elif sentence[-1] != '.':
+            sentence += '. \n'
+    except IndexError:
+        # print(sentence)
+        sentence = 'None. \n'
 
-            days_tweet_text += text
+    return sentence
 
-        daily_text.append(days_tweet_text)
 
-    return daily_text
+def group_tweet_texts(tweets):
+    text = ''
+    for tweet in tweets:
+        sentence = remove_special_chars(tweet.full_text)
+        text += sentence
+
+    return text
 
 
 def get_sentiment_for_text(text):
     sentiment = google_analyse_sentiment.analyze(text)
     return sentiment
-
-
-def get_unique_days(list_of_days):
-    s = set(list_of_days)
-    lst = list(s)
-    lst.sort()
-    return lst
-
-
-def split_tweets_into_daily(tweets):
-    days = []
-    for tweet in tweets:
-        day = datetime.strptime(tweet.date, '%Y-%m-%d')
-        days.append(day)
-
-    unique = get_unique_days(days)
-    binned_tweets = []
-
-    for day in unique:
-        days_tweets = []
-
-        for tweet in tweets:
-            tweet_day = datetime.strptime(tweet.date, '%Y-%m-%d')
-            if tweet_day == day:
-                days_tweets.append(tweet.full_text)
-
-        binned_tweets.append(days_tweets)
-
-    return unique, binned_tweets
 
 
 def remove_filters(tweets, filters):
@@ -208,7 +231,8 @@ def convert_list_to_string(lst):
 
 def save_tweets_to_db(tweets, fire_row_id, conn):
     for tweet in tweets:
-        tweet_row = (int(tweet.tweet_id), fire_row_id, tweet.full_text, tweet.date, int(tweet.author_id))
+        tweet_row = (int(tweet.tweet_id), fire_row_id, tweet.full_text, tweet.date, tweet.dtime, int(tweet.author_id),
+                     tweet.author_name, tweet.author_username, tweet.retweet_count, tweet.sentiment, tweet.magnitude)
 
         tweet_row_id = SQLite.create_tweet(conn,tweet_row)
 
@@ -229,23 +253,47 @@ def save_entities_to_db(entities, tweet_id):
 
 
 def save_fire_to_db(fire, conn):
-    sent_as_str = convert_list_to_string(fire[16])
-    ov_pos_sent = convert_list_to_string(fire[18])
-    ov_neg_sent = convert_list_to_string([fire[19]])
-    mag_as_str = convert_list_to_string(fire[20])
-    num_tw_as_str = convert_list_to_string(fire[22])
-
     fire_row = (int(fire[0]),float(fire[1]),float(fire[2]),float(fire[3]),float(fire[4]),fire[5],fire[6],float(fire[7]),float(fire[8]),float(fire[9]),fire[10],fire[11],
-                fire[12],fire[13],fire[14],fire[15],sent_as_str,float(fire[17]), ov_pos_sent, ov_neg_sent,mag_as_str,float(fire[21]),num_tw_as_str, fire[23])
+                fire[12],fire[13],fire[14],fire[15],float(fire[16]),float(fire[17]),float(fire[18]))
 
     fire_row_ID = SQLite.create_fire(conn, fire_row)
     print('fire_ID: {} successfully saved to database.'.format(fire[0]))
     return fire_row_ID
 
 
+def check_database_for_tweet(tweet, conn):
+    id = tweet.tweet_id
+    q = """SELECT * FROM tweets WHERE tweet_ID = {};""".format(id)
+    result = SQLite.execute_query(q, conn, table='tweets')
+    if len(result.index) >= 1:
+        print('Tweet found in database! Using value')
+        old_sentiment = result['sentiment'][0]
+        old_magnitude = result['magnitude'][0]
+        if tweet.sentiment is None and tweet.magnitude is None:
+            tweet.sentiment = old_sentiment
+            tweet.magnitude = old_magnitude
+        return True, tweet
+    else:
+        return False, tweet
+
+
+def check_database_for_fire(fire_ID):
+    q = """SELECT * FROM fires WHERE fire_ID = {};""".format(fire_ID)
+    result = SQLite.execute_query(q, conn, table='fires')
+    if len(result.index) == 1:
+        print('fire {} found in db already, skipping'.format(fire_ID))
+        return True
+    elif len(result.index) == 0:
+        print('fire {} not found in db, analysing'.format(fire_ID))
+        return False
+    else:
+        raise Exception
+
+
 with open("datasets/V4_Ignitions_2016_I.csv", 'r') as dataset_incomplete:
 
     reader = csv.reader(dataset_incomplete, delimiter=',')
+    next(reader, None)  # skip the headers
 
     # WRITE HEADER
     # with open('datasets/V4_Ignitions_2016.csv', 'w') as dataset:
@@ -276,16 +324,11 @@ with open("datasets/V4_Ignitions_2016_I.csv", 'r') as dataset_incomplete:
     #                      # 'wind_bearing',
     #                      # 'wind_speed',
     #                      'sentiment',
-    #                      'overall_sentiment',
-    #                      'overall_positive_sentiment',
-    #                      'overall_negative_sentiment',
     #                      'magnitude',
-    #                      'overall_magnitude',
     #                      'num_tweets',
-    #                      'total_tweets'
     #                     ])
 
-    database = 'test.db'
+    database = 'US_V3.db'
     # create a database connection
     conn = SQLite.create_connection(database)
 
@@ -294,7 +337,9 @@ with open("datasets/V4_Ignitions_2016_I.csv", 'r') as dataset_incomplete:
         for row in reader:
             # IF ROW IS NOT ANALYSED YET THEN ANALYSE
             # TODO: CHNAGE ROW ID HERE IF PARTIALLY ANALYSED
-            if check_sentiment_column(row) and int(row[0]) > 0: # 21096:
+            fire_in_db = check_database_for_fire(row[0])
+            # note highest US fire id is 123394
+            if not fire_in_db and int(row[0]) <= 123394: # 21096:
 
                 # GET START, END DATES, LOCATION WORDS AND GENERATE QUERY
                 start_date, end_date = get_start_end_dates(row)
@@ -312,88 +357,197 @@ with open("datasets/V4_Ignitions_2016_I.csv", 'r') as dataset_incomplete:
 
                 # GET TWEETS FOR FIRE
                 while True:
-
+                    # tweets = get_tweets(start_date, end_date, query, row[0])
                     try:
                         tweets = get_tweets(start_date, end_date, query, row[0])
                         tweets = remove_filters(tweets, filters)
                         num_tweets = len(tweets)
+                        print('{} tweets found.'.format(num_tweets))
                     except:
-                        print('Error collecting tweets')
+                        print('Error collecting tweets. Retrying')
                         continue
                     break
 
-                # GROUP TWEETS FOR ANALYSIS
-                unique_days, grouped_daily_tweets = split_tweets_into_daily(tweets)
+                if tweets != []:
 
-                num_tweets_vector = []
-                for day_of_tweets in grouped_daily_tweets:
-                    num_tweets_vector.append(len(day_of_tweets))
-                    if len(day_of_tweets) < 5:
-                        print('found less than 5 tweets for a day')
+                    # CHECK TO SEE WHICH TWEETS ARE ALREADY IN THE DATABASE
+                    tweets_to_analyse = []
+                    analysed_tweets = []
+                    for tweet in tweets:
+                        in_db, tweet = check_database_for_tweet(tweet, conn)
+                        if not in_db:
+                            tweets_to_analyse.append(tweet)
+                        else:
+                            analysed_tweets.append(tweet)
 
-                grouped_text = group_tweet_texts(grouped_daily_tweets)
+                    # unique_days, grouped_daily_tweets = split_tweets_into_daily(tweets_to_analyse)
+                    num_analysed = len(analysed_tweets)
+                    num_to_analyse = len(tweets_to_analyse)
+                    print('{} tweets pulled from database, analysing {} extra tweets'.format(num_analysed,num_to_analyse))
 
-                if len(grouped_text) != 0:
+                    grouped_text = group_tweet_texts(tweets_to_analyse)
+
                     # ANALYSE SENTIMENT OF GROUPED TWEETS
-                    sentiment_vector = []
-                    positive_sentiment_vector = []
-                    negative_sentiment_vector = []
-                    magnitude_vector = []
-                    # For each days tweets
-                    for day in grouped_text:
-                        # analyse tweets for day, add metrics to vector
-                        sentiment = get_sentiment_for_text(day)
+                    sentiment = get_sentiment_for_text(grouped_text)
 
-                        score = sentiment.score
-                        magnitude = sentiment.magnitude
-                        sentiment_vector.append(score)
-                        magnitude_vector.append(magnitude)
-                        positive_sentiment_vector.append(sentiment.overall_positive_sentiment)
-                        negative_sentiment_vector.append(sentiment.overall_negative_sentiment)
+                    if len(sentiment.sentences) != len(tweets_to_analyse):
+                        print('sentences and tweets dont match. difference of {}'.format(abs(len(sentiment.sentences) - len(tweets_to_analyse))))
+                        # raise Exception
 
-                    # weather_vector = DarkSkyAPI.get_weather_vector(start_date, end_date, lat, lon)
-                    # for x in weather_vector:
-                    #     print(x)
+                        non_matched_tweets = []
+                        for tweet in tweets_to_analyse:
+                            reduced_text = remove_special_chars(tweet.full_text).replace('.', '').replace(' \n', '').strip()
+                            for sentence in sentiment.sentences:
+                                sentence_text = sentence.text.replace('.', '').replace(' \n', '').strip()
+                                if reduced_text == sentence_text:
+                                    score = sentence.score
+                                    magnitude = sentence.magnitude
+                                    tweet.sentiment = score
+                                    tweet.magnitude = magnitude
 
-                    # fig, (ax1, ax2) = plt.subplots(2)
-                    # fig.suptitle('fire ID: {} over burn period ({} to {})'.format(row[0], start_date, end_date))
-                    # ax1.set_title('SUM(Sentiment)')
-                    # ax2.set_title('SUM(Magnitude)')
-                    # ax2.plot(unique_days, magnitude_vector, color='g')
-                    #
-                    # ax1.plot(unique_days, sentiment_vector, color='b')
-                    # ax1.bar(unique_days, positive_sentiment_vector, color='g')
-                    # ax1.bar(unique_days, negative_sentiment_vector, color='r')
-                    #
-                    # plt.show()
+                                    # print(tweet)
+                                    break
+                            if tweet.sentiment is None:
+                                print('cannot match Tweet: {}'.format(reduced_text))
+                                non_matched_tweets.append(tweet)
+                                # tweet.sentiment = 0
+                                # tweet.magnitude = 0
 
-                    # Sum social metrics
-                    total_sentiment = sum(sentiment_vector)
-                    total_magnitude = sum(magnitude_vector)
-                    total_tweets = sum(num_tweets_vector)
-                    print('TOTAL TWEETS FOR FIRE: {}'.format(total_tweets))
+                        print('total tweets not matched: {} trying to re-analyse'.format(len(non_matched_tweets)))
+                        non_matched_grouped_text = group_tweet_texts(non_matched_tweets)
+                        sentiment_2 = get_sentiment_for_text(non_matched_grouped_text)
+                        non_matched_num = 0
+                        for tweet in non_matched_tweets:
+                            red_txt = remove_special_chars(tweet.full_text).replace(' \n', '').strip()
+                            for sentence in sentiment_2.sentences:
+                                sentence_text = sentence.text.replace('.', '').replace(' \n', '').strip()
+                                fuzzy_ratio = fuzz.partial_ratio(red_txt,sentence_text)
+                                print('{} AND {}. FUZZY RATIO: {}'.format(red_txt,sentence_text, fuzzy_ratio))
+                                print(fuzzy_ratio)
+                                if fuzzy_ratio > 90:
+                                    print('{} \n {}. \n FUZZY RATIO: {} MATCHED'.format(red_txt,sentence_text, fuzzy_ratio))
+                                    score = sentence.score
+                                    magnitude = sentence.magnitude
+                                    tweet.sentiment = score
+                                    tweet.magnitude = magnitude
+                                    # print(tweet)
+                                    tweets_to_analyse.append(tweet)
+                                    break
 
-                    # add variables to row
-                    row.append(sentiment_vector)
-                    row.append(total_sentiment)
-                    row.append(positive_sentiment_vector)
-                    row.append(negative_sentiment_vector)
-                    row.append(magnitude_vector)
-                    row.append(total_magnitude)
-                    row.append(num_tweets_vector)
-                    row.append(total_tweets)
+                            if tweet.sentiment is None:
+                                print('still cannot match Tweet: {}'.format(reduced_text))
+                                non_matched_num += 1
+                                tweet.sentiment = 0
+                                tweet.magnitude = 0
 
-                    print(row)
+                        print('total non matched: {}'.format(non_matched_num))
+
+                    else:
+                        for sentence in sentiment.sentences:
+                            sentence_index = sentence.index
+                            tweet = tweets_to_analyse[sentence_index]
+                            score = sentence.score
+                            magnitude = sentence.magnitude
+                            tweet.sentiment = score
+                            tweet.magnitude = magnitude
+                            # print(tweet)
+
+                    analysed_tweets = analysed_tweets + tweets_to_analyse
+                    analysed_tweets.sort(key=lambda x: x.dtime, reverse=False)
+                    for tweet in analysed_tweets:
+                        if tweet.sentiment is None and tweet.magnitude is None:
+                            print('Non analysed tweet: {}'.format(tweet.full_text))
+                            tweet.sentiment = 0
+                            tweet.magnitude = 0
+
+                    avg_sentiment = 0
+                    magnitude = 0
+                    for tweet in analysed_tweets:
+                        avg_sentiment += tweet.sentiment
+                        magnitude += tweet.magnitude
+                    avg_sentiment = avg_sentiment / len(analysed_tweets)
+
+                    print('SENTIMENT SCORE FOR FIRE {}. SCORE: {}, MAGNITUDE: {}'.format(row[0], avg_sentiment, magnitude))
+                    row.append(avg_sentiment)
+                    row.append(magnitude)
+                    row.append(len(analysed_tweets))
 
                     #SAVE TWEETS, FIRE IN DATABASE
-                    # fire_row_id = save_fire_to_db(row, conn)
-                    # save_tweets_to_db(tweets, row[0], conn)
+                    fire_row_id = save_fire_to_db(row, conn)
+                    save_tweets_to_db(tweets, row[0], conn)
 
                     # SAVE FIRE DATA TO CSV
                     # with open('datasets/V4_Ignitions_2016.csv', 'a') as dataset:
                     #     writer = csv.writer(dataset, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
                     #     writer.writerow(row)
+                else:
+                    row.append(0)
+                    row.append(0)
+                    row.append(0)
+                    fire_row_id = save_fire_to_db(row, conn)
 
-                    print('row ID {} saved'.format(row[0]))
+            print('row ID {} saved'.format(row[0]))
 
         print('dataset sentiment analysed successfully')
+
+
+# weather_vector = DarkSkyAPI.get_weather_vector(start_date, end_date, lat, lon)
+# for x in weather_vector:
+#     print(x)
+
+# fig, (ax1, ax2) = plt.subplots(2)
+# fig.suptitle('fire ID: {} over burn period ({} to {})'.format(row[0], start_date, end_date))
+# ax1.set_title('SUM(Sentiment)')
+# ax2.set_title('SUM(Magnitude)')
+# ax2.plot(unique_days, magnitude_vector, color='g')
+#
+# ax1.plot(unique_days, sentiment_vector, color='b')
+# ax1.bar(unique_days, positive_sentiment_vector, color='g')
+# ax1.bar(unique_days, negative_sentiment_vector, color='r')
+#
+# plt.show()
+#
+# def get_unique_days(list_of_days):
+#     s = set(list_of_days)
+#     lst = list(s)
+#     lst.sort()
+#     return lst
+
+# def split_tweets_into_daily(tweets):
+#     days = []
+#     for tweet in tweets:
+#         datetime = parse(tweet.date)
+#         day = datetime.date().strftime("%Y/%m/%d")
+#         # day = datetime.strptime(tweet.date, '%Y-%m-%d')
+#         days.append(day)
+#
+#     unique = get_unique_days(days)
+#     binned_tweets = []
+#
+#     for day in unique:
+#         days_tweets = []
+#
+#         for tweet in tweets:
+#             tweet_day = datetime.strptime(tweet.date, '%Y-%m-%d')
+#             if tweet_day == day:
+#                 days_tweets.append(tweet.full_text)
+#
+#         binned_tweets.append(days_tweets)
+#
+#     return unique, binned_tweets
+
+#     sentiment_vector = []
+#     positive_sentiment_vector = []
+#     negative_sentiment_vector = []
+#     magnitude_vector = []
+#     # For each days tweets
+#     for day in grouped_text:
+#         # analyse tweets for day, add metrics to vector
+#         sentiment = get_sentiment_for_text(day)
+#
+#         score = sentiment.score
+#         magnitude = sentiment.magnitude
+#         sentiment_vector.append(score)
+#         magnitude_vector.append(magnitude)
+#         positive_sentiment_vector.append(sentiment.overall_positive_sentiment)
+#         negative_sentiment_vector.append(sentiment.overall_negative_sentiment)

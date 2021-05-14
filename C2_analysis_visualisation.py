@@ -24,6 +24,7 @@ import xgboost as xgb
 from xgboost import XGBClassifier
 import sklearn.metrics
 from scipy.interpolate import interp1d
+from sklearn.metrics import accuracy_score
 
 
 pd.set_option("display.max_rows", None, "display.max_columns", None)
@@ -290,13 +291,65 @@ fires_df['landcover_cat'] = fires_df['landcover'].astype('category').cat.codes
 fires_df['state_cat'] = fires_df['state'].astype('category').cat.codes
 
 
+def predict_cat(X, target_var, target_name):
+    X_train, X_test, y_train, y_test = train_test_split(X, target_var, test_size=0.25)
+
+    # Various hyper-parameters to tune
+    xgb1 = xgb.XGBClassifier()
+    parameters = {'nthread': [4], #when use hyperthread, xgboost may become slower
+                  'objective': ['binary:logistic'], #['reg:linear'],
+                  'learning_rate': [0.0001, 0.001, 0.01, 0.1, 0.2, 0.3], #so called `eta` value
+                  'max_depth': [7, 8, 9, 10],
+                  'min_child_weight': [4],
+                  'verbosity': [0],
+                  'subsample': [0.7],
+                  'colsample_bytree': [0.4, 0.6],
+                  'n_estimators': [100, 200, 300, 400, 500]}
+
+    # parameters = {}
+
+    xgb_grid = GridSearchCV(xgb1,
+                            parameters,
+                            cv = 4,
+                            n_jobs = 4,
+                            verbose=True)
+
+    xgb_grid.fit(X_train, y_train)
+
+    print(xgb_grid.best_score_)
+    print(xgb_grid.best_params_)
+
+    y_pred = xgb_grid.predict(X_test)
+    y_test = y_test.to_numpy()
+    for i in range(len(y_pred)):
+        print('True: {} pred: {}'.format(y_test[i], y_pred[i]))
+
+
+    print('Results for target variable: {}'.format(target_name))
+
+    accuracy = accuracy_score(y_test, y_pred)
+    print('accuracy: {}'.format(accuracy))
+
+    xgb.plot_tree(xgb_grid.best_estimator_,num_trees=0)
+    plt.savefig('V3_graphs/tree_{}.png'.format(target_name), dpi=2000, bbox_inches='tight')
+    plt.show()
+
+    # here the f score is how often the variable is split on - i.e. the F(REQUENCY) score
+    xgb.plot_importance(xgb_grid.best_estimator_)
+    plt.tight_layout()
+    plt.savefig('V3_graphs/feature_importance_{}.png'.format(target_name))
+    plt.show()
+
+    return None
+
+
 def predict(X, target_var, target_name):
     X_train, X_test, y_train, y_test = train_test_split(X, target_var, test_size=0.25)
 
     # Various hyper-parameters to tune
     xgb1 = xgb.XGBRegressor()
     parameters = {'nthread': [4], #when use hyperthread, xgboost may become slower
-                  'objective': ['reg:linear'],
+                  'objective': ['binary:logistic'], #['reg:linear'],
                   'learning_rate': [0.0001, 0.001, 0.01, 0.1, 0.2, 0.3], #so called `eta` value
                   'max_depth': [7, 8, 9, 10],
                   'min_child_weight': [4],
@@ -335,13 +388,13 @@ def predict(X, target_var, target_name):
     print(score)
 
     xgb.plot_tree(xgb_grid.best_estimator_,num_trees=0)
-    plt.savefig('graphs/tree_{}.png'.format(target_name), dpi=2000, bbox_inches='tight')
+    plt.savefig('V3_graphs/tree_{}.png'.format(target_name), dpi=2000, bbox_inches='tight')
     # plt.show()
 
     # here the f score is how often the variable is split on - i.e. the F(REQUENCY) score
     xgb.plot_importance(xgb_grid.best_estimator_)
     plt.tight_layout()
-    plt.savefig('graphs/feature_importance_{}.png'.format(target_name))
+    plt.savefig('V3_graphs/feature_importance_{}.png'.format(target_name))
     # plt.show()
 
     return None
@@ -368,11 +421,17 @@ def interpolate_vector(fire_col, fire_df, length):
     fire_df['interp_data'] = interp_data
     return fire_df
 
+# df = fires_df.drop(columns=['fire_ID', 'direction_cat', 'landcover_cat', 'state_cat'])
+# df.plot(subplots=True, layout=(4,6))
+# df.hist(bins=30, figsize=(15, 5))
+# plt.show()
+
 
 # PART 1 F(X) - PREDICTING SOCIAL SENTIMENT VALUES
 predictors = ['latitude', 'longitude', 'size', 'perimeter', 's_duration', 'speed', 'expansion', 'pop_density', 'direction_cat', 'landcover_cat', 'state_cat', 'start_doy', 'end_doy']
 targets = ['s_mean', 'm_mean', 'overall_magnitude', 'overall_sentiment', 'total_tweets', 's_var', 'm_var']
 X = fires_df[predictors]
+X2 = fires_df[targets]
 
 for pred in targets:
     print(fires_df[pred].describe())
@@ -381,12 +440,23 @@ for pred in targets:
 # h = s_mean.hist(bins = 300)
 # print(fires_df['s_mean'].describe())
 
-fires_df = interpolate_vector('sentiment', fires_df, 20)
-
-for target in targets:
-    predict(X, fires_df[target], target)
+# fires_df = interpolate_vector('sentiment', fires_df, 20)
 
 
+
+# f(x)
+# for target in targets:
+#     predict(X, fires_df[target], target)
+
+
+# g(x)
+for pred in predictors:
+    if pred == 'landcover_cat' or pred == 'state_cat' or pred == 'direction_cat':
+        predict_cat(X2, fires_df[pred], pred)
+    # else:
+    #     predict(X, fires_df[pred], pred)
+    # if pred == 'start_doy' or pred == 'end_doy':
+    #     predict(X2, fires_df[pred], pred)
 
 
 # OLD MARCH 21 WORK - PCA OF SENTIMENT VECTORS, KMEANS OF FIRES ETC

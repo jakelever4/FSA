@@ -51,7 +51,7 @@ def full_archive_search(query, start_date, end_date, next_token):
         return None, None
 
     headers = create_headers(bearer_token)
-    query_params = {'query': query, 'start_time': start_date, 'end_time': end_date, 'tweet.fields': 'author_id,context_annotations,created_at,entities,geo,id,text', 'user.fields': 'description', 'next_token':next_token, 'max_results': 500}
+    query_params = {'query': query, 'start_time': start_date, 'end_time': end_date, 'tweet.fields': 'author_id,context_annotations,created_at,entities,geo,id,text,public_metrics,referenced_tweets,reply_settings,withheld', 'user.fields': 'description,id,name,username', 'next_token':next_token, 'max_results': 500, 'expansions': 'author_id'}
     json_response = connect_to_endpoint(search_url, headers, query_params)
 
 
