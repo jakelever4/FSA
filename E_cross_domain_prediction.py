@@ -36,7 +36,6 @@ speed_predictor_AUS = pickle.load(open('models/speed_predictor_AUS.p', 'rb'))
 speed_predictor_NA = pickle.load(open('models/speed_predictor_NA.p', 'rb'))
 
 # test
-
 def run_cross_prediction(target, predictors, aus_predictor, na_predictor):
     # load datasets
     pd.set_option("display.max_rows", None, "display.max_columns", None)

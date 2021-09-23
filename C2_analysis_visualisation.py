@@ -25,15 +25,18 @@ from xgboost import XGBClassifier
 import sklearn.metrics
 from scipy.interpolate import interp1d
 from sklearn.metrics import accuracy_score
+from sklearn import svm
 
 
 pd.set_option("display.max_rows", None, "display.max_columns", None)
 db_file = 'database.db'
+db_file_aus = 'australia.db'
 conn = SQLite.create_connection(db_file)
+conn_aus = SQLite.create_connection(db_file_aus)
 crs = {'init': 'epsg:4326'}
 
 # fires_df = SQLite.select_all_fires(conn)
-
+fires_df_aus = SQLite.select_all_fires(conn_aus)
 
 def get_unique_days_for_fire(fire_ID, conn):
     q = """SELECT DISTINCT date FROM tweets WHERE fire_ID = {};""".format(fire_ID)
@@ -41,8 +44,56 @@ def get_unique_days_for_fire(fire_ID, conn):
     return dates
 
 
-# Create more vars: calculates avg sentiment, date range,
-# also max/min sentiment across all fires, min/max avg sentiment across all fires
+# LOADING IN AUS DATA FROM DATABASE TO PANDAS DATAFRAME
+s_vecs = []
+m_vecs = []
+for ind in fires_df_aus.index:
+    fire_ID = fires_df_aus['fire_ID'][ind]
+    print('calculating variables for fire id {}, index {}'.format(fire_ID, ind))
+    unique_days = get_unique_days_for_fire(fire_ID, conn_aus)
+    sentiment_vec = []
+    magnitude_vec = []
+
+    for day in unique_days:
+        q = """SELECT * FROM tweets WHERE fire_ID = {} AND date = '{}' ; """.format(fire_ID, day)
+        tweets_for_day = SQLite.execute_query(q, conn_aus,table='tweets')
+
+        sentiment_for_day = tweets_for_day['sentiment'].sum()
+        magnitude_for_day = tweets_for_day['magnitude'].sum()
+        sentiment_vec.append(sentiment_for_day)
+        magnitude_vec.append(magnitude_for_day)
+
+    s_vecs.append(sentiment_vec)
+    m_vecs.append(magnitude_vec)
+
+fires_df_aus['sentiment'] = s_vecs
+fires_df_aus['magnitude'] = m_vecs
+
+fires_df_aus['start_doy'] = fires_df_aus['start_date'].apply(lambda  x: datetime.strptime(x, '%Y-%m-%d').timetuple().tm_yday)
+fires_df_aus['end_doy'] = fires_df_aus['end_date'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d').timetuple().tm_yday)
+
+avg_magnitude = []
+for ind, row in fires_df_aus.iterrows():
+    # s = [x / y for x,y in zip(row['sentiment'],row['num_tweets'])]
+
+    m = [x / y for x,y in row['magnitude'] / row['num_tweets']]
+    # avg_sentiment.append(s)
+    avg_magnitude.append(m)
+
+# fires_df['s'] = avg_sentiment
+fires_df_aus['avg_magnitude'] = avg_magnitude
+
+fires_df_aus['s_mean'] = fires_df_aus['sentiment'].apply(lambda x: statistics.mean(x))
+fires_df_aus['s_var'] = fires_df_aus['sentiment'].apply(lambda x: np.var(x))
+
+fires_df_aus['m_mean'] = fires_df_aus['magnitude'].apply(lambda x: statistics.mean(x))
+fires_df_aus['m_var'] = fires_df_aus['magnitude'].apply(lambda x: np.var(x))
+
+fires_df_aus.to_csv('fires_df_aus.csv', index=False)
+
+
+# # Create more vars: calculates avg sentiment, date range,
+# # also max/min sentiment across all fires, min/max avg sentiment across all fires
 # avg_sent_col = []
 # date_range_col = []
 # duration2_col = []
@@ -51,8 +102,8 @@ def get_unique_days_for_fire(fire_ID, conn):
 #
 #     sentiment = fires_df['sentiment'][ind]
 #     magnitude = fires_df['magnitude'][ind]
-#     pos_sentiment = fires_df['overall_positive_sentiment'][ind]
-#     neg_sentiment = fires_df['overall_negative_sentiment'][ind]
+#     # pos_sentiment = fires_df['overall_positive_sentiment'][ind]
+#     # neg_sentiment = fires_df['overall_negative_sentiment'][ind]
 #
 #     # start_date = datetime.strptime(fires_df['start_date'][ind], '%Y-%m-%d')
 #     # end_date = datetime.strptime(fires_df['end_date'][ind], '%Y-%m-%d')
@@ -115,7 +166,6 @@ def get_unique_days_for_fire(fire_ID, conn):
 # print('SAVING DF')
 # fires_df.to_csv('fires_df.csv', index = False)
 
-
 # print('Max sent: {}, on day: {} of fire ID {}'.format(max_sentiment,max_sent_day_index,fires_df['fire_ID'][fire_row_index]))
 # print('Max pos sent: {}, on day: {} of fire ID {}'.format(max_pos_sent,pos_sent_day,fires_df['fire_ID'][pos_sent_fire]))
 # print('Max  neg sent: {}, on day: {} of fire ID {}'.format(max_neg_sent,neg_sent_day,fires_df['fire_ID'][neg_sent_fire]))
@@ -123,7 +173,11 @@ def get_unique_days_for_fire(fire_ID, conn):
 # print('Min  avg sent: {}, on day: {} of fire ID {}'.format(min_avg_sentiment,min_avg_day_index,fires_df['fire_ID'][min_avg_fire]))
 
 
+# load in Australian Data and convert
 
+
+
+# Load in US Dataset
 fires_df = pd.read_csv('fires_df.csv')
 
 fires_df['sentiment'] = fires_df['sentiment'].apply(lambda x: json.loads(x))
@@ -154,6 +208,26 @@ fires_df['m_mean'] = fires_df['magnitude'].apply(lambda x: statistics.mean(x))
 fires_df['m_var'] = fires_df['magnitude'].apply(lambda x: np.var(x))
 
 fires_df.drop(columns=['duration'])
+
+
+# # load in AUS Dataset
+# aus_df = pd.read_csv('datasets/AUS_Ignitions_2016.csv')
+
+
+
+def gini(actual, pred):
+    assert (len(actual) == len(pred))
+    all = np.asarray(np.c_[actual, pred, np.arange(len(actual))], dtype=np.float)
+    all = all[np.lexsort((all[:, 2], -1 * all[:, 1]))]
+    totalLosses = all[:, 0].sum()
+    giniSum = all[:, 0].cumsum().sum() / totalLosses
+
+    giniSum -= (len(actual) + 1) / 2.
+    return giniSum / len(actual)
+
+
+def gini_normalized(actual, pred):
+    return gini(actual, pred) / gini(actual, actual)
 
 
 def run_kmeans(kmax, data):
@@ -349,7 +423,7 @@ def predict(X, target_var, target_name):
     # Various hyper-parameters to tune
     xgb1 = xgb.XGBRegressor()
     parameters = {'nthread': [4], #when use hyperthread, xgboost may become slower
-                  'objective': ['binary:logistic'], #['reg:linear'],
+                  'objective': ['reg:linear'], #['binary:logistic'],
                   'learning_rate': [0.0001, 0.001, 0.01, 0.1, 0.2, 0.3], #so called `eta` value
                   'max_depth': [7, 8, 9, 10],
                   'min_child_weight': [4],
@@ -378,6 +452,11 @@ def predict(X, target_var, target_name):
     mae = metrics.mean_absolute_error(y_test, y_pred)
     mse = metrics.mean_squared_error(y_test, y_pred)
 
+    # gini_predictions = gini(y_test, y_pred)
+    # gini_max = gini(y_test, y_test)
+    # ngini= gini_normalized(y_test, y_pred)
+    # print('Gini: %.3f, Max. Gini: %.3f, Normalized Gini: %.3f' % (gini_predictions, gini_max, ngini))
+
     print('Results for target variable: {}'.format(target_name))
 
     print('R2 Score: {}'.format(r2))
@@ -389,12 +468,81 @@ def predict(X, target_var, target_name):
 
     xgb.plot_tree(xgb_grid.best_estimator_,num_trees=0)
     plt.savefig('V3_graphs/tree_{}.png'.format(target_name), dpi=2000, bbox_inches='tight')
-    # plt.show()
+    plt.show()
 
     # here the f score is how often the variable is split on - i.e. the F(REQUENCY) score
     xgb.plot_importance(xgb_grid.best_estimator_)
     plt.tight_layout()
     plt.savefig('V3_graphs/feature_importance_{}.png'.format(target_name))
+    plt.show()
+
+    return xgb_grid
+
+
+def predict_SVR(X, target_var, target_name):
+    # Preprocessing
+    scaler = StandardScaler()
+    X_transformed = scaler.fit_transform(X)
+    X_train, X_test, y_train, y_test = train_test_split(X, target_var, test_size=0.25)
+
+    # Various hyper-parameters to tune
+    svr = svm.SVR()
+    parameters = {'kernel': ['linear', 'poly', 'rbf', 'sigmoid'],
+                  # 'degree' : [3, 4, 5],
+                  # 'gamma' : ['scale', 'auto'],
+                  # 'tol' : [0.001, 0.0001] ,
+                  'C' : [0.1, 1, 10, 100],
+                  'epsilon' : [0.01, 0.1, 1]
+                  }
+
+    parameters_old = {'kernel': ['rbf', 'linear', 'poly'],
+                       'C':[0.1,1,10,100],
+                       'gamma': [0.0001,0.001,0.01,0.1],
+                       'epsilon':[0.01,0.001,0.1]}
+
+    svr_grid = GridSearchCV(svr,
+                            parameters_old,
+                            cv = 4,
+                            n_jobs = 4,
+                            verbose=True)
+
+    print('training for variable: {}'.format(target_name))
+    svr_grid.fit(X_train, y_train)
+
+    print(svr_grid.best_score_)
+    print(svr_grid.best_params_)
+
+    y_pred = svr_grid.predict(X_test)
+    y_test = y_test.to_numpy()
+    for i in range(len(y_pred)):
+        print('True: {} pred: {}'.format(y_test[i], y_pred[i]))
+
+    r2 = metrics.r2_score(y_test, y_pred)
+    mae = metrics.mean_absolute_error(y_test, y_pred)
+    mse = metrics.mean_squared_error(y_test, y_pred)
+
+    # gini_predictions = gini(y_test, y_pred)
+    # gini_max = gini(y_test, y_test)
+    # ngini= gini_normalized(y_test, y_pred)
+    # print('Gini: %.3f, Max. Gini: %.3f, Normalized Gini: %.3f' % (gini_predictions, gini_max, ngini))
+    #
+    # print('Results for target variable: {}'.format(target_name))
+
+    print('R2 Score: {}'.format(r2))
+    print('MAE: {}'.format(mae))
+    print('MSE: {}'.format(mse))
+
+    score = svr_grid.score(X_test, y_test)
+    print(score)
+
+    # xgb.plot_tree(xgb_grid.best_estimator_,num_trees=0)
+    # plt.savefig('V3_graphs/tree_{}.png'.format(target_name), dpi=2000, bbox_inches='tight')
+    # # plt.show()
+    #
+    # # here the f score is how often the variable is split on - i.e. the F(REQUENCY) score
+    # xgb.plot_importance(xgb_grid.best_estimator_)
+    # plt.tight_layout()
+    # plt.savefig('V3_graphs/feature_importance_{}.png'.format(target_name))
     # plt.show()
 
     return None
@@ -426,6 +574,29 @@ def interpolate_vector(fire_col, fire_df, length):
 # df.hist(bins=30, figsize=(15, 5))
 # plt.show()
 
+# AUS WORK
+# aus_df['location_cat'] = aus_df['location'].astype('category').cat.codes
+# aus_df['state_cat'] = aus_df['state'].astype('category').cat.codes
+# aus_df['start_doy'] = aus_df['start_date'].apply(lambda  x: datetime.strptime(x, '%Y-%m-%d').timetuple().tm_yday)
+# aus_df['end_doy'] = aus_df['end_date'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d').timetuple().tm_yday)
+#
+# aus_df['tweet_freq'] = aus_df['num_tweets'] / aus_df['duration']
+# # s_mean = aus_df['sentiment'].apply(lambda x: statistics.mean(x))
+#
+#
+# aus_predictors = ['tweet_freq','latitude','longitude','size','perimeter','start_doy','end_doy','duration','speed','expansion','state_cat','location_cat']
+# aus_targets = ['sentiment','magnitude','num_tweets']
+#
+# X_aus = aus_df[aus_predictors]
+#
+# # f(x) aus
+# for target in aus_targets:
+#     target_mean = aus_df[target].mean()
+#     target_var = aus_df[target].var()
+#     print('Target variable {}: mean: {}, Variance: {}.'.format(target,target_mean, target_var))
+#     # predict(X_aus, aus_df[target], target)
+
+
 
 # PART 1 F(X) - PREDICTING SOCIAL SENTIMENT VALUES
 predictors = ['latitude', 'longitude', 'size', 'perimeter', 's_duration', 'speed', 'expansion', 'pop_density', 'direction_cat', 'landcover_cat', 'state_cat', 'start_doy', 'end_doy']
@@ -433,30 +604,45 @@ targets = ['s_mean', 'm_mean', 'overall_magnitude', 'overall_sentiment', 'total_
 X = fires_df[predictors]
 X2 = fires_df[targets]
 
-for pred in targets:
-    print(fires_df[pred].describe())
+# create test data for Australian data
+X_aus = fires_df_aus[predictors]
+X2_aus = fires_df_aus[targets]
 
 # s_mean = fires_df['s_mean']
 # h = s_mean.hist(bins = 300)
 # print(fires_df['s_mean'].describe())
-
 # fires_df = interpolate_vector('sentiment', fires_df, 20)
 
+# f(x) US
+for target in targets:
+    # predict_SVR(X, fires_df[target], target)
+    xbg = predict(X, fires_df[target], target)
+
+    # part 2 aus
+    results = xgb.predict(X_aus)
+    print(results)
 
 
-# f(x)
-# for target in targets:
-#     predict(X, fires_df[target], target)
 
 
 # g(x)
 for pred in predictors:
     if pred == 'landcover_cat' or pred == 'state_cat' or pred == 'direction_cat':
-        predict_cat(X2, fires_df[pred], pred)
-    # else:
-    #     predict(X, fires_df[pred], pred)
-    # if pred == 'start_doy' or pred == 'end_doy':
-    #     predict(X2, fires_df[pred], pred)
+        None
+        # predict_cat(X2, fires_df[pred], pred)
+    else:
+        predict(X, fires_df[pred], pred)
+
+    if pred == 'start_doy' or pred == 'end_doy':
+        predict(X2, fires_df[pred], pred)
+
+
+
+
+
+
+
+
 
 
 # OLD MARCH 21 WORK - PCA OF SENTIMENT VECTORS, KMEANS OF FIRES ETC

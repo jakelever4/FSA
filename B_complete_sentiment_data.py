@@ -30,17 +30,21 @@ def get_queries_from_location(state, country, location_list):
                 and value != 'No'  and value != 'No.' and value != 'no':
             location_list.append(value)
 
-    # filt = ''
-    # for value in filters:
-    #     filt += ' -' + value
-    #
-    # print(filt)
+    i=0
 
-    for loc in location_list:
-        if loc.strip() == 'USA' or loc.strip() =='Canada':
+    while i < len(location_list):
+        loc = location_list[i]
+        if loc.strip() == 'WA' or loc.strip() == 'Australia':
             location_list.remove(loc)
+        else:
+            i += 1
+
+    # for loc in location_list:
+    #     if loc.strip() == 'USA' or loc.strip() =='Canada' or loc.strip() == 'WA' or loc.strip() == 'Australia' ' Australia':
+    #         location_list.remove(loc)
 
     location_list.append(state)
+
     hashtags = ''
     for location in location_list:
         loc = location.strip().replace(' ', '')
@@ -49,7 +53,20 @@ def get_queries_from_location(state, country, location_list):
 
         hashtags += ' OR ' + loc_hashtag1 + ' OR ' + loc_hashtag2
 
-    fire_keywords = ') ( Wildfire OR Wildfires OR Landscape burn OR "wildland burn" )'
+    fire_keywords = ') ( Wildfire OR Wildfires OR "Landscape burn" OR "wildland burn"  OR bushfire )'
+
+    # only relevant fro aus data obviously
+    location_list = location_list[:-1]
+    if state.strip() == 'Western Australia':
+        state = '"Western Australia"'
+    elif state.strip() == 'Northern Territory':
+        state = '"Northern Territory"'
+    elif state.strip() == 'South Australia':
+        state = '"South Australia"'
+    elif state.strip() == 'New South Wales':
+        state = '"New South Wales"'
+
+    location_list.append(state)
 
     location_keywords = '( '
     for location in location_list:
@@ -290,45 +307,45 @@ def check_database_for_fire(fire_ID):
         raise Exception
 
 
-with open("datasets/V4_Ignitions_2016_I.csv", 'r') as dataset_incomplete:
+with open("datasets/aus_data_wcats.csv", 'r') as dataset_incomplete:
 
     reader = csv.reader(dataset_incomplete, delimiter=',')
     next(reader, None)  # skip the headers
 
     # WRITE HEADER
-    # with open('datasets/V4_Ignitions_2016.csv', 'w') as dataset:
-    #     writer = csv.writer(dataset, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-    #     writer.writerow(['fire_ID',
-    #                      'latitude',
-    #                      'longitude',
-    #                      'size',
-    #                      'perimeter',
-    #                      'start_date',
-    #                      'end_date',
-    #                      'duration',
-    #                      'speed',
-    #                      'expansion',
-    #                      'direction',
-    #                      'landcover',
-    #                      'location',
-    #                      'state',
-    #                      'state_short',
-    #                      'pop_density',
-    #                      # 'cloud_cover',
-    #                      # 'humidity',
-    #                      # 'precip_intensity',
-    #                      # 'precip_prob',
-    #                      # 'pressure',
-    #                      # 'max_temp',
-    #                      # 'uv_index',
-    #                      # 'wind_bearing',
-    #                      # 'wind_speed',
-    #                      'sentiment',
-    #                      'magnitude',
-    #                      'num_tweets',
-    #                     ])
+    with open('datasets/AUS_Ignitions.csv', 'w') as dataset:
+        writer = csv.writer(dataset, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        writer.writerow(['fire_ID',
+                         'latitude',
+                         'longitude',
+                         'size',
+                         'perimeter',
+                         'start_date',
+                         'end_date',
+                         'duration',
+                         'speed',
+                         'expansion',
+                         'direction',
+                         'landcover',
+                         'location',
+                         'state',
+                         'state_short',
+                         'pop_density',
+                         # 'cloud_cover',
+                         # 'humidity',
+                         # 'precip_intensity',
+                         # 'precip_prob',
+                         # 'pressure',
+                         # 'max_temp',
+                         # 'uv_index',
+                         # 'wind_bearing',
+                         # 'wind_speed',
+                         'sentiment',
+                         'magnitude',
+                         'num_tweets',
+                        ])
 
-    database = 'US_V3.db'
+    database = 'australia.db'
     # create a database connection
     conn = SQLite.create_connection(database)
 
@@ -339,12 +356,15 @@ with open("datasets/V4_Ignitions_2016_I.csv", 'r') as dataset_incomplete:
             # TODO: CHNAGE ROW ID HERE IF PARTIALLY ANALYSED
             fire_in_db = check_database_for_fire(row[0])
             # note highest US fire id is 123394
-            if not fire_in_db and int(row[0]) <= 123394: # 21096:
+            if not fire_in_db and int(row[0]) >= 884578: # 865654:
 
                 # GET START, END DATES, LOCATION WORDS AND GENERATE QUERY
                 start_date, end_date = get_start_end_dates(row)
                 location_list, state, state_short = get_location_list(row)
                 query = get_queries_from_location(state, state_short, location_list)
+
+                # FOR AUS DATA: REMOVE OLD SENTMENT, MAGNITUDE AND NUM_TWEETS VALES, AS WE ARE ABOUT TO RECALCULATE THEM.REMOVE FOR US  DATA
+                row = row[:-3]
 
                 # ADD POPULATION DENSITY TO ROW
                 try:

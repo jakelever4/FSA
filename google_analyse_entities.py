@@ -43,3 +43,8 @@ def analyze_entities(text_content):
         print(entity_obj)
 
     return entities
+
+
+text = "#BCWildfire Service is responding to the Brenda Creek wildfire (K51924) currently burning south of the #Okanagan Connector (#BCHwy97C), highly visible from the roadside. ~40km from #WestKelowna, this fire is estimated to be 40 ha and is classified as “Out of Control.”"
+entities = analyze_entities(text)
+print(entities)
