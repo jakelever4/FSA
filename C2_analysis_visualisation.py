@@ -26,7 +26,10 @@ import sklearn.metrics
 from scipy.interpolate import interp1d
 from sklearn.metrics import accuracy_score
 from sklearn import svm
-
+import time
+from sklearn.neural_network import MLPRegressor
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import RobustScaler
 
 pd.set_option("display.max_rows", None, "display.max_columns", None)
 db_file = 'database.db'
@@ -45,49 +48,70 @@ def get_unique_days_for_fire(fire_ID, conn):
 
 
 # LOADING IN AUS DATA FROM DATABASE TO PANDAS DATAFRAME
-s_vecs = []
-m_vecs = []
-for ind in fires_df_aus.index:
-    fire_ID = fires_df_aus['fire_ID'][ind]
-    print('calculating variables for fire id {}, index {}'.format(fire_ID, ind))
-    unique_days = get_unique_days_for_fire(fire_ID, conn_aus)
-    sentiment_vec = []
-    magnitude_vec = []
+# s_vecs = []
+# m_vecs = []
+# for ind in fires_df_aus.index:
+#     fire_ID = fires_df_aus['fire_ID'][ind]
+#     print('calculating variables for fire id {}, index {}'.format(fire_ID, ind))
+#     unique_days = get_unique_days_for_fire(fire_ID, conn_aus)
+#     sentiment_vec = []
+#     magnitude_vec = []
+#
+#     for day in unique_days:
+#         q = """SELECT * FROM tweets WHERE fire_ID = {} AND date = '{}' ; """.format(fire_ID, day)
+#         tweets_for_day = SQLite.execute_query(q, conn_aus,table='tweets')
+#
+#         sentiment_for_day = tweets_for_day['sentiment'].sum()
+#         magnitude_for_day = tweets_for_day['magnitude'].sum()
+#         sentiment_vec.append(sentiment_for_day)
+#         magnitude_vec.append(magnitude_for_day)
+#
+#     s_vecs.append(sentiment_vec)
+#     m_vecs.append(magnitude_vec)
+#
+# fires_df_aus['sentiment'] = s_vecs
+# fires_df_aus['magnitude'] = m_vecs
+#
+# fires_df_aus['start_doy'] = fires_df_aus['start_date'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d').timetuple().tm_yday)
+# fires_df_aus['end_doy'] = fires_df_aus['end_date'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d').timetuple().tm_yday)
 
-    for day in unique_days:
-        q = """SELECT * FROM tweets WHERE fire_ID = {} AND date = '{}' ; """.format(fire_ID, day)
-        tweets_for_day = SQLite.execute_query(q, conn_aus,table='tweets')
+# fires_df_aus.to_csv('fires_df_aus_incomplete.csv')
 
-        sentiment_for_day = tweets_for_day['sentiment'].sum()
-        magnitude_for_day = tweets_for_day['magnitude'].sum()
-        sentiment_vec.append(sentiment_for_day)
-        magnitude_vec.append(magnitude_for_day)
+fires_df_aus = pd.read_csv('fires_df_aus_incomplete.csv')
 
-    s_vecs.append(sentiment_vec)
-    m_vecs.append(magnitude_vec)
-
-fires_df_aus['sentiment'] = s_vecs
-fires_df_aus['magnitude'] = m_vecs
-
-fires_df_aus['start_doy'] = fires_df_aus['start_date'].apply(lambda  x: datetime.strptime(x, '%Y-%m-%d').timetuple().tm_yday)
-fires_df_aus['end_doy'] = fires_df_aus['end_date'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d').timetuple().tm_yday)
-
-avg_magnitude = []
-for ind, row in fires_df_aus.iterrows():
-    # s = [x / y for x,y in zip(row['sentiment'],row['num_tweets'])]
-
-    m = [x / y for x,y in row['magnitude'] / row['num_tweets']]
-    # avg_sentiment.append(s)
-    avg_magnitude.append(m)
+# avg_magnitude = []
+# for ind, row in fires_df_aus.iterrows():
+#     s = [x / row['num_tweets'] for x in row['sentiment']]
+#
+#     m = [x / row['num_tweets'] for x in row['magnitude']]
+#     avg_sentiment.append(s)
+#     avg_magnitude.append(m)
 
 # fires_df['s'] = avg_sentiment
-fires_df_aus['avg_magnitude'] = avg_magnitude
+# fires_df_aus['avg_magnitude'] = avg_magnitude
+
+fires_df_aus['sentiment'] = fires_df_aus['sentiment'].apply(lambda x: json.loads(x))
+fires_df_aus['magnitude'] = fires_df_aus['magnitude'].apply(lambda x: json.loads(x))
+
+# remove fires with no tweets
+indexNames = fires_df_aus[ fires_df_aus['num_tweets'] == 0].index
+# Delete these row indexes from dataFrame
+fires_df_aus.drop(indexNames, inplace=True)
 
 fires_df_aus['s_mean'] = fires_df_aus['sentiment'].apply(lambda x: statistics.mean(x))
 fires_df_aus['s_var'] = fires_df_aus['sentiment'].apply(lambda x: np.var(x))
 
 fires_df_aus['m_mean'] = fires_df_aus['magnitude'].apply(lambda x: statistics.mean(x))
 fires_df_aus['m_var'] = fires_df_aus['magnitude'].apply(lambda x: np.var(x))
+
+fires_df_aus['direction_cat'] = fires_df_aus['direction'].astype('category').cat.codes
+fires_df_aus['landcover_cat'] = fires_df_aus['landcover'].astype('category').cat.codes
+fires_df_aus['state_cat'] = fires_df_aus['state'].astype('category').cat.codes
+
+fires_df_aus['s_duration'] = fires_df_aus['duration']
+fires_df_aus['overall_sentiment'] = fires_df_aus['sentiment'].apply(lambda x: sum(x))
+fires_df_aus['overall_magnitude'] = fires_df_aus['magnitude'].apply(lambda x: sum(x))
+fires_df_aus['total_tweets'] = fires_df_aus['num_tweets']
 
 fires_df_aus.to_csv('fires_df_aus.csv', index=False)
 
@@ -212,7 +236,6 @@ fires_df.drop(columns=['duration'])
 
 # # load in AUS Dataset
 # aus_df = pd.read_csv('datasets/AUS_Ignitions_2016.csv')
-
 
 
 def gini(actual, pred):
@@ -356,9 +379,9 @@ def perform_PCA(fires_df, n_components, attribute):
 # APRIL 2021 - PREDICTING SENTIMENTAL VARIABLES
 
 # categorical variables to convert
-print(fires_df['direction'].value_counts())
-print(fires_df['landcover'].value_counts())
-print(fires_df['state'].value_counts())
+# print(fires_df['direction'].value_counts())
+# print(fires_df['landcover'].value_counts())
+# print(fires_df['state'].value_counts())
 
 fires_df['direction_cat'] = fires_df['direction'].astype('category').cat.codes
 fires_df['landcover_cat'] = fires_df['landcover'].astype('category').cat.codes
@@ -395,8 +418,8 @@ def predict_cat(X, target_var, target_name):
 
     y_pred = xgb_grid.predict(X_test)
     y_test = y_test.to_numpy()
-    for i in range(len(y_pred)):
-        print('True: {} pred: {}'.format(y_test[i], y_pred[i]))
+    # for i in range(len(y_pred)):
+    #     print('True: {} pred: {}'.format(y_test[i], y_pred[i]))
 
 
     print('Results for target variable: {}'.format(target_name))
@@ -438,61 +461,144 @@ def predict(X, target_var, target_name):
                             n_jobs = 4,
                             verbose=True)
 
+    print('training GB RFR on target {}'.format(target_name))
+    start = time.time()
     xgb_grid.fit(X_train, y_train)
+    stop = time.time()
+    training_time = stop - start
+    print('training time: {}'.format(training_time))
 
     print(xgb_grid.best_score_)
     print(xgb_grid.best_params_)
 
+    start = time.time()
     y_pred = xgb_grid.predict(X_test)
+    stop = time.time()
+    training_time = stop - start
+    print('execution time on test set: {}'.format(training_time))
     y_test = y_test.to_numpy()
-    for i in range(len(y_pred)):
-        print('True: {} pred: {}'.format(y_test[i], y_pred[i]))
+    # for i in range(len(y_pred)):
+        # print('True: {} pred: {}'.format(y_test[i], y_pred[i]))
 
-    r2 = metrics.r2_score(y_test, y_pred)
+    # r2 = metrics.r2_score(y_test, y_pred)
     mae = metrics.mean_absolute_error(y_test, y_pred)
     mse = metrics.mean_squared_error(y_test, y_pred)
 
-    # gini_predictions = gini(y_test, y_pred)
-    # gini_max = gini(y_test, y_test)
-    # ngini= gini_normalized(y_test, y_pred)
-    # print('Gini: %.3f, Max. Gini: %.3f, Normalized Gini: %.3f' % (gini_predictions, gini_max, ngini))
+    gini_predictions = gini(y_test, y_pred)
+    gini_max = gini(y_test, y_test)
+    ngini= gini_normalized(y_test, y_pred)
+    print('Gini: %.3f, Max. Gini: %.3f, Normalized Gini: %.3f' % (gini_predictions, gini_max, ngini))
 
     print('Results for target variable: {}'.format(target_name))
 
-    print('R2 Score: {}'.format(r2))
+    # print('R2 Score: {}'.format(r2))
     print('MAE: {}'.format(mae))
     print('MSE: {}'.format(mse))
 
     score = xgb_grid.score(X_test, y_test)
-    print(score)
+    print('score: {}'.format(score))
+
+    rmse = np.sqrt(mse)
+    print("RMSE: %f" % (rmse))
 
     xgb.plot_tree(xgb_grid.best_estimator_,num_trees=0)
-    plt.savefig('V3_graphs/tree_{}.png'.format(target_name), dpi=2000, bbox_inches='tight')
-    plt.show()
+    plt.savefig('V3_graphs/tree_{}_2.png'.format(target_name), dpi=2000, bbox_inches='tight')
+    # plt.show()
 
     # here the f score is how often the variable is split on - i.e. the F(REQUENCY) score
     xgb.plot_importance(xgb_grid.best_estimator_)
     plt.tight_layout()
     plt.savefig('V3_graphs/feature_importance_{}.png'.format(target_name))
-    plt.show()
+    # plt.show()
 
     return xgb_grid
+
+
+def predict_NN(X, target_var, target_name):
+    # Preprocessing
+    # scaler = StandardScaler()
+    # X_transformed = scaler.fit_transform(X)
+    X_train, X_test, y_train, y_test = train_test_split(X, target_var, test_size=0.25)
+
+    estimator = Pipeline([
+        ("scaler", RobustScaler(quantile_range=(15, 85))),
+        ("estimator", MLPRegressor(max_iter=6000, early_stopping=True)),
+    ])
+
+    # Preprocessing
+    scaler = StandardScaler()
+    X_transformed = scaler.fit_transform(X)
+    X_train, X_test, y_train, y_test = train_test_split(X_transformed, target_var, test_size=0.25)
+
+    nn = MLPRegressor(max_iter=10000, early_stopping=True)
+
+    hidden_layer_sizes = [
+        (15,10,3),
+        (20,10),
+        (10)
+    ]
+    hyper_parameters = [
+        {   # Hyper parameter for lbfgs solver
+            'solver': ['adam', 'sgd'],
+            'activation': ['tanh', 'relu', 'logistic'],
+            'alpha': [0.1, 0.001, 0.0001],
+            'learning_rate': ['invscaling', 'adaptive'],
+            'hidden_layer_sizes': hidden_layer_sizes,
+            'random_state': [0, 42, 100, 3452],
+        },
+    ]
+
+    nn_grid = GridSearchCV(nn, hyper_parameters, refit=True, n_jobs=4, cv=4, verbose=0)
+
+    print('training NN model for variable: {}'.format(target_name))
+    start = time.time()
+    nn_grid.fit(X_train, y_train)
+    stop = time.time()
+    training_time = stop - start
+    print('training time: {}'.format(training_time))
+
+    print(nn_grid.best_score_)
+    print(nn_grid.best_params_)
+
+    start = time.time()
+    y_pred = nn_grid.predict(X_test)
+    stop = time.time()
+    test_time = stop - start
+    print('excution time on test set: {}'.format(test_time))
+
+    y_test = y_test.to_numpy()
+    # for i in range(len(y_pred)):
+    #     print('True: {} pred: {}'.format(y_test[i], y_pred[i]))
+
+    # r2 = metrics.r2_score(y_test, y_pred)
+    mae = metrics.mean_absolute_error(y_test, y_pred)
+    mse = metrics.mean_squared_error(y_test, y_pred)
+    rmse = np.sqrt(mse)
+
+    print('MAE: {}'.format(mae))
+    print('MSE: {}'.format(mse))
+    print('RMSE: {}'.format(rmse))
+
+    score = nn_grid.score(X_test, y_test)
+    print('score: {}'.format(score))
+
+    return nn_grid
 
 
 def predict_SVR(X, target_var, target_name):
     # Preprocessing
     scaler = StandardScaler()
     X_transformed = scaler.fit_transform(X)
-    X_train, X_test, y_train, y_test = train_test_split(X, target_var, test_size=0.25)
+    X_train, X_test, y_train, y_test = train_test_split(X_transformed, target_var, test_size=0.25)
 
     # Various hyper-parameters to tune
     svr = svm.SVR()
     parameters = {'kernel': ['linear', 'poly', 'rbf', 'sigmoid'],
-                  # 'degree' : [3, 4, 5],
-                  # 'gamma' : ['scale', 'auto'],
-                  # 'tol' : [0.001, 0.0001] ,
+                  'degree' : [3, 4, 5],
+                  'gamma' : ['scale', 'auto'],
+                  'tol' : [0.001, 0.0001] ,
                   'C' : [0.1, 1, 10, 100],
-                  'epsilon' : [0.01, 0.1, 1]
+                  'epsilon' : [0.01,0.001,0.1]
                   }
 
     parameters_old = {'kernel': ['rbf', 'linear', 'poly'],
@@ -504,48 +610,41 @@ def predict_SVR(X, target_var, target_name):
                             parameters_old,
                             cv = 4,
                             n_jobs = 4,
-                            verbose=True)
+                            verbose=0)
 
-    print('training for variable: {}'.format(target_name))
+    print('training SVR model for variable: {}'.format(target_name))
+    start = time.time()
     svr_grid.fit(X_train, y_train)
+    stop = time.time()
+    training_time = stop - start
+    print('training time: {}'.format(training_time))
 
     print(svr_grid.best_score_)
     print(svr_grid.best_params_)
 
+    start = time.time()
     y_pred = svr_grid.predict(X_test)
-    y_test = y_test.to_numpy()
-    for i in range(len(y_pred)):
-        print('True: {} pred: {}'.format(y_test[i], y_pred[i]))
+    stop = time.time()
+    training_time = stop - start
+    print('execution time on test set: {}'.format(training_time))
 
-    r2 = metrics.r2_score(y_test, y_pred)
+    y_test = y_test.to_numpy()
+    # for i in range(len(y_pred)):
+    #     print('True: {} pred: {}'.format(y_test[i], y_pred[i]))
+
+    # r2 = metrics.r2_score(y_test, y_pred)
     mae = metrics.mean_absolute_error(y_test, y_pred)
     mse = metrics.mean_squared_error(y_test, y_pred)
+    rmse = np.sqrt(mse)
 
-    # gini_predictions = gini(y_test, y_pred)
-    # gini_max = gini(y_test, y_test)
-    # ngini= gini_normalized(y_test, y_pred)
-    # print('Gini: %.3f, Max. Gini: %.3f, Normalized Gini: %.3f' % (gini_predictions, gini_max, ngini))
-    #
-    # print('Results for target variable: {}'.format(target_name))
-
-    print('R2 Score: {}'.format(r2))
     print('MAE: {}'.format(mae))
     print('MSE: {}'.format(mse))
+    print('RMSE: {}'.format(rmse))
 
     score = svr_grid.score(X_test, y_test)
-    print(score)
+    print('score: {}'.format(score))
 
-    # xgb.plot_tree(xgb_grid.best_estimator_,num_trees=0)
-    # plt.savefig('V3_graphs/tree_{}.png'.format(target_name), dpi=2000, bbox_inches='tight')
-    # # plt.show()
-    #
-    # # here the f score is how often the variable is split on - i.e. the F(REQUENCY) score
-    # xgb.plot_importance(xgb_grid.best_estimator_)
-    # plt.tight_layout()
-    # plt.savefig('V3_graphs/feature_importance_{}.png'.format(target_name))
-    # plt.show()
-
-    return None
+    return svr_grid
 
 
 def interpolate_vector(fire_col, fire_df, length):
@@ -569,34 +668,6 @@ def interpolate_vector(fire_col, fire_df, length):
     fire_df['interp_data'] = interp_data
     return fire_df
 
-# df = fires_df.drop(columns=['fire_ID', 'direction_cat', 'landcover_cat', 'state_cat'])
-# df.plot(subplots=True, layout=(4,6))
-# df.hist(bins=30, figsize=(15, 5))
-# plt.show()
-
-# AUS WORK
-# aus_df['location_cat'] = aus_df['location'].astype('category').cat.codes
-# aus_df['state_cat'] = aus_df['state'].astype('category').cat.codes
-# aus_df['start_doy'] = aus_df['start_date'].apply(lambda  x: datetime.strptime(x, '%Y-%m-%d').timetuple().tm_yday)
-# aus_df['end_doy'] = aus_df['end_date'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d').timetuple().tm_yday)
-#
-# aus_df['tweet_freq'] = aus_df['num_tweets'] / aus_df['duration']
-# # s_mean = aus_df['sentiment'].apply(lambda x: statistics.mean(x))
-#
-#
-# aus_predictors = ['tweet_freq','latitude','longitude','size','perimeter','start_doy','end_doy','duration','speed','expansion','state_cat','location_cat']
-# aus_targets = ['sentiment','magnitude','num_tweets']
-#
-# X_aus = aus_df[aus_predictors]
-#
-# # f(x) aus
-# for target in aus_targets:
-#     target_mean = aus_df[target].mean()
-#     target_var = aus_df[target].var()
-#     print('Target variable {}: mean: {}, Variance: {}.'.format(target,target_mean, target_var))
-#     # predict(X_aus, aus_df[target], target)
-
-
 
 # PART 1 F(X) - PREDICTING SOCIAL SENTIMENT VALUES
 predictors = ['latitude', 'longitude', 'size', 'perimeter', 's_duration', 'speed', 'expansion', 'pop_density', 'direction_cat', 'landcover_cat', 'state_cat', 'start_doy', 'end_doy']
@@ -608,247 +679,432 @@ X2 = fires_df[targets]
 X_aus = fires_df_aus[predictors]
 X2_aus = fires_df_aus[targets]
 
-# s_mean = fires_df['s_mean']
-# h = s_mean.hist(bins = 300)
-# print(fires_df['s_mean'].describe())
-# fires_df = interpolate_vector('sentiment', fires_df, 20)
+
+# create combined dataset of US and AUS data
+X_com = pd.concat([X,X_aus], axis=0)
+X2_com = pd.concat([X2,X2_aus], axis=0)
+
+
 
 # f(x) US
-for target in targets:
-    # predict_SVR(X, fires_df[target], target)
-    xbg = predict(X, fires_df[target], target)
+# for target in targets:
+    # x_us = X2[target]
+    # x_aus = X2_aus[target]
+    # x_com = X2_com[target]
+    # x_max = max(x_com)
+    # x_min = min(x_com)
+    #
+    # bins = np.linspace(x_min, x_max, 100)
+    #
+    # # plt.hist(x_com, bins, alpha=0.5, label="Combined Data")
+    # # plt.hist(x_us, bins, alpha=0.5, label='US Data')
+    # # plt.hist(x_aus, bins, alpha=0.5, label='AUS Data')
+    #
+    # fig, ax1 = plt.subplots()
+    # ax1.hist([x_com, x_us, x_aus], bins, alpha=0.5, label=["Combined Data", 'US Data', 'AUS Data'])
+    # ax1.legend(loc='upper right')
+    # ax1.set_ylabel(target)
+    # ax1.set_title('Histogram of US, Australian and Combined Datasets for {}'.format(target))
+    # plt.savefig('A_newgraphs/datasets_histogram_{}.png'.format(target), bbox_inches='tight')
+    # # plt.show()
 
-    # part 2 aus
-    results = xgb.predict(X_aus)
-    print(results)
+    # print('\n\n\n\n\n\n  RESULTS FOR TARGET VARIABLE : {} '.format(target))
+
+
+    # Create models
+    # print('training US models on US DATA:')
+    # model = predict(X, X2[target], target)
+    # svr = predict_SVR(X, X2[target], target)
+    # nn = predict_NN(X, X2[target], target)
+
+    # print('training AUS models on AUS DATA:')
+    # aus_model = predict(X_aus, X2_aus[target], target)
+    # svr_aus = predict_SVR(X_aus, X2_aus[target], target)
+    # nn_aus = predict_NN(X_aus, X2_aus[target], target)
+
+    # print('creating GBRF models on combined dataset.')
+    # combined_model = predict(X_com,X2_com[target], target)
+    # combined_nn = predict_NN(X_com, X2_com[target], target)
+    # combined_svr = predict_SVR(X_com, X2_com[target], target)
+
+    # Part 2 cross prediction
+    # print('PART2: starting cross prediciton of datasets')
+    # rf_pred_aus_results = model.predict(X_aus)
+    # rf_pred_us_results = aus_model.predict(X)
+
+    # nn_pred_aus_results = nn.predict(X_aus)
+    # nn_pred_us_results = nn_aus.predict(X)
+    #
+    # svr_pred_aus_results = svr.predict(X_aus)
+    # svr_pred_us_results = svr.predict(X)
+    #
+    # true_aus = X2_aus[target].array
+    # true_us = X2[target].array
+
+     # GBRF
+    # mae_aus_rf = metrics.mean_absolute_error(true_aus, rf_pred_aus_results)
+    # mse_aus_rf = metrics.mean_squared_error(true_aus, rf_pred_aus_results)
+    # rmse_aus_rf = np.sqrt(mse_aus_rf)
+    # print('Method; GBRF , Training data: US, Test Data: AUS, MAE: {}, MSE: {} , RMSE: {}'.format(mae_aus_rf,mse_aus_rf,rmse_aus_rf))
+    #
+    # mae_us_rf = metrics.mean_absolute_error(rf_pred_us_results, true_us)
+    # mse_us_rf = metrics.mean_squared_error(rf_pred_us_results, true_us)
+    # rmse_us_rf = np.sqrt(mse_us_rf)
+    # print('Method; GBRF , Training data: AUS, Test Data: US, MAE: {}, MSE: {} , RMSE: {}'.format(mae_us_rf,mse_us_rf,rmse_us_rf))
+
+     # NN
+    # mae_aus_nn = metrics.mean_absolute_error(true_aus, nn_pred_aus_results)
+    # mse_aus_nn = metrics.mean_squared_error(true_aus, nn_pred_aus_results)
+    # rmse_aus_nn = np.sqrt(mse_aus_nn)
+    # print('Method; NN , Training data: US, Test Data: AUS, MAE: {}, MSE: {} , RMSE: {}'.format(mae_aus_nn,mse_aus_nn,rmse_aus_nn))
+    #
+    # mae_us_nn = metrics.mean_absolute_error(nn_pred_us_results, true_us)
+    # mse_us_nn = metrics.mean_squared_error(nn_pred_us_results, true_us)
+    # rmse_us_nn = np.sqrt(mse_us_nn)
+    # print('Method; NN , Training data: AUS, Test Data: US, MAE: {}, MSE: {} , RMSE: {}'.format(mae_us_nn,mse_us_nn,rmse_us_nn))
+    #
+    #  # SVR
+    # mae_aus_svr = metrics.mean_absolute_error(true_aus, svr_pred_aus_results)
+    # mse_aus_svr = metrics.mean_squared_error(true_aus, svr_pred_aus_results)
+    # rmse_aus_svr = np.sqrt(mse_aus_svr)
+    # print('Method; SVR , Training data: US, Test Data: AUS, MAE: {}, MSE: {} , RMSE: {}'.format(mae_aus_svr,mse_aus_svr,rmse_aus_svr))
+    #
+    # mae_us_svr = metrics.mean_absolute_error(svr_pred_us_results, true_us)
+    # mse_us_svr = metrics.mean_squared_error(svr_pred_us_results, true_us)
+    # rmse_us_svr = np.sqrt(mse_us_svr)
+    # print('Method; SVR , Training data: AUS, Test Data: US, MAE: {}, MSE: {} , RMSE: {}'.format(mae_us_svr,mse_us_svr,rmse_us_svr))
 
 
 
+
+
+
+# PART 2 G(X) - PREDICTING SOCIAL SENTIMENT VALUES
+targets = ['latitude', 'longitude', 'size', 'perimeter', 's_duration', 'speed', 'expansion', 'pop_density', 'start_doy', 'end_doy', 'direction_cat', 'landcover_cat', 'state_cat']
+predictors = ['s_mean', 'm_mean', 'overall_magnitude', 'overall_sentiment', 'total_tweets', 's_var', 'm_var']
+X = fires_df[predictors]
+X2 = fires_df[targets]
+
+# create test data for Australian data
+X_aus = fires_df_aus[predictors]
+X2_aus = fires_df_aus[targets]
+
+
+# create combined dataset of US and AUS data
+X_com = pd.concat([X,X_aus], axis=0)
+X2_com = pd.concat([X2,X2_aus], axis=0)
 
 # g(x)
-for pred in predictors:
-    if pred == 'landcover_cat' or pred == 'state_cat' or pred == 'direction_cat':
-        None
-        # predict_cat(X2, fires_df[pred], pred)
-    else:
-        predict(X, fires_df[pred], pred)
+for target in ['speed', 'expansion', 'pop_density', 'start_doy', 'end_doy']:
+    print('\n\n\n\n\n\n  RESULTS FOR TARGET VARIABLE : {} '.format(target))
 
-    if pred == 'start_doy' or pred == 'end_doy':
-        predict(X2, fires_df[pred], pred)
+    # # Create models
+    # print('training US models on US DATA:')
+    # # model = predict(X, X2[target], target)
+    # svr = predict_SVR(X, X2[target], target)
+    # nn = predict_NN(X, X2[target], target)
+    #
+    # print('training AUS models on AUS DATA:')
+    # # aus_model = predict(X_aus, X2_aus[target], target)
+    # svr_aus = predict_SVR(X_aus, X2_aus[target], target)
+    # nn_aus = predict_NN(X_aus, X2_aus[target], target)
 
+    print('creating GBRF models on combined dataset.')
+    combined_model = predict(X_com,X2_com[target], target)
+    combined_nn = predict_NN(X_com, X2_com[target], target)
+    combined_svr = predict_SVR(X_com, X2_com[target], target)
 
+    # # Part 2 cross prediction
+    # print('PART2: starting cross prediciton of datasets')
+    # # rf_pred_aus_results = model.predict(X_aus)
+    # # rf_pred_us_results = aus_model.predict(X)
+    #
+    # nn_pred_aus_results = nn.predict(X_aus)
+    # nn_pred_us_results = nn_aus.predict(X)
+    #
+    # svr_pred_aus_results = svr.predict(X_aus)
+    # svr_pred_us_results = svr.predict(X)
+    #
+    # true_aus = X2_aus[target].array
+    # true_us = X2[target].array
 
+    # GBRF
+    # mae_aus_rf = metrics.mean_absolute_error(true_aus, rf_pred_aus_results)
+    # mse_aus_rf = metrics.mean_squared_error(true_aus, rf_pred_aus_results)
+    # rmse_aus_rf = np.sqrt(mse_aus_rf)
+    # print('Method; GBRF , Training data: US, Test Data: AUS, MAE: {}, MSE: {} , RMSE: {}'.format(mae_aus_rf,mse_aus_rf,rmse_aus_rf))
+    #
+    # mae_us_rf = metrics.mean_absolute_error(rf_pred_us_results, true_us)
+    # mse_us_rf = metrics.mean_squared_error(rf_pred_us_results, true_us)
+    # rmse_us_rf = np.sqrt(mse_us_rf)
+    # print('Method; GBRF , Training data: AUS, Test Data: US, MAE: {}, MSE: {} , RMSE: {}'.format(mae_us_rf,mse_us_rf,rmse_us_rf))
 
-
-
-
-
-
-
-# OLD MARCH 21 WORK - PCA OF SENTIMENT VECTORS, KMEANS OF FIRES ETC
-
-
-fires_df = fires_df.sort_values(['s_duration', 'fire_ID'], ascending=[0,1])
-
-
-pca_dim = 8
-pca_var = 'avg_sentiment'
-
-reduced_data = perform_PCA(fires_df,pca_dim, pca_var)
-x = pd.DataFrame.from_records(np.array(reduced_data['PCA_data']))
-
-kmeans, k = run_kmeans(14, x)
-labels = kmeans.labels_
-reduced_data['label'] = labels
-
-colors = ['red','green','blue','purple', 'cyan', 'orange', 'yellow', 'navy', 'black', 'slateblue', 'indigo', 'plum', 'violet', 'aqua']
-
-fig, axs = plt.subplots(k,2, figsize=(20, 10))
-
-fig.suptitle('Reduced and Original Dataset coloured by Kmeans label')
-axs[0,0].set_title('Reduced Data (PCA)')
-axs[1,0].set(xlabel='Day', ylabel=pca_var)
-axs[0,1].set_title('Original Data')
-axs[1,1].set(xlabel='Day', ylabel=pca_var)
-
-reduced_label_means = []
-x_label_means = []
-for l in range(k):
-    fires = reduced_data[reduced_data['label'] == l]
-
-    red_data = pd.DataFrame.from_records(np.array(fires['PCA_data']))
-    rd_mean = np.mean(red_data)
-    reduced_label_means.append(rd_mean)
-    x = pd.DataFrame.from_records(np.array(fires[pca_var]))
-    mean_x = np.mean(x)
-    x_label_means.append(mean_x)
-
-    for ind, fire in fires.iterrows():
-        rd = fire['PCA_data']
-        x = fire[pca_var]
-        axs[l,0].plot(range(len(rd)), rd, c=colors[l])
-        axs[l,1].plot(range(len(x)), x, c=colors[l])
-
-    axs[l,0].plot(range(len(rd_mean)), rd_mean, c='black')
-    axs[l,1].plot(range(len(mean_x)), mean_x, c='black')
-    axs[l,0].set(ylabel=pca_var)
-    axs[l,0].set(ylabel=pca_var)
-    # axs[l,0].plot(np.unique(x), np.poly1d(np.polyfit(x, range(len(x)), 1))(np.unique(x)))
-
-plt.show()
-
-def plot_PCA_data(fire):
-    fig, ax = plt.subplots(figsize=(20, 10))
-    fig.suptitle('Reduced Data Sentiment Curve for fire id {}'.format(fire['fire_ID']))
-
-    reduced_data = fire['PCA_data']
-    ax.plot(range(len(reduced_data)), reduced_data)
-    ax.set(xlabel='t', ylabel=pca_var)
-    ax.set_ylim([-1, 1])
-    ax.plot(range(len(reduced_data)), np.zeros(len(reduced_data)), color='deepskyblue', ls=':')
-    plt.show()
+    # NN
+    # mae_aus_nn = metrics.mean_absolute_error(true_aus, nn_pred_aus_results)
+    # mse_aus_nn = metrics.mean_squared_error(true_aus, nn_pred_aus_results)
+    # rmse_aus_nn = np.sqrt(mse_aus_nn)
+    # print('Method; NN , Training data: US, Test Data: AUS, MAE: {}, MSE: {} , RMSE: {}'.format(mae_aus_nn,mse_aus_nn,rmse_aus_nn))
+    #
+    # mae_us_nn = metrics.mean_absolute_error(nn_pred_us_results, true_us)
+    # mse_us_nn = metrics.mean_squared_error(nn_pred_us_results, true_us)
+    # rmse_us_nn = np.sqrt(mse_us_nn)
+    # print('Method; NN , Training data: AUS, Test Data: US, MAE: {}, MSE: {} , RMSE: {}'.format(mae_us_nn,mse_us_nn,rmse_us_nn))
+    #
+    # # SVR
+    # mae_aus_svr = metrics.mean_absolute_error(true_aus, svr_pred_aus_results)
+    # mse_aus_svr = metrics.mean_squared_error(true_aus, svr_pred_aus_results)
+    # rmse_aus_svr = np.sqrt(mse_aus_svr)
+    # print('Method; SVR , Training data: US, Test Data: AUS, MAE: {}, MSE: {} , RMSE: {}'.format(mae_aus_svr,mse_aus_svr,rmse_aus_svr))
+    #
+    # mae_us_svr = metrics.mean_absolute_error(svr_pred_us_results, true_us)
+    # mse_us_svr = metrics.mean_squared_error(svr_pred_us_results, true_us)
+    # rmse_us_svr = np.sqrt(mse_us_svr)
+    # print('Method; SVR , Training data: AUS, Test Data: US, MAE: {}, MSE: {} , RMSE: {}'.format(mae_us_svr,mse_us_svr,rmse_us_svr))
 
 
 
-# DATA MODELLING / ML
-# X = PHYSICAL VARIABLES - PREDICTORS
-# Y = SOCIAL VARIABLES - TARGETS
-
-
-X = reduced_data.filter(predictors, axis=1) # 'direction', 'landcover', 'latitude', 'longitude',
-
-Y = reduced_data.filter(['sentiment', 'overall_sentiment', 'overall_positive_sentiment', 'overall_negative_sentiment',
-                         'magnitude', 'overall_magnitude', 'num_tweets', 'total_tweets', 'avg_sentiment',
-                         'avg_magnitude', 's_mean', 's_var', 'm_mean', 'm_var', 'reduced_data', 'label'], axis=1)
-
-y = Y['label']
-
-
-def predict_labels(X, labels):
-    X_train, X_test, y_train, y_test = train_test_split(X, labels, test_size=0.25)
-
-    # param_grid = {
-    #     'booster': ['gbtree', 'dart'],
-    #     'n_estimators': [100,500],
-    #     'eta': [0.1,0.3],
-    #     #'gamma': [0, 1],
-    #     'max_depth': [2,4],
-    #     #'lambda': [1,2],
-    #     #'alpha': [0,1],
-    #     #'tree_method': ['auto', 'exact', 'approx', 'hist']
-    # }
-
-    parameters = {'nthread': [4], #when use hyperthread, xgboost may become slower
-                  'objective': ['reg:logistic'],
-                  'learning_rate': [0.0001, 0.001, 0.01, 0.1, 0.2], #so called `eta` value
-                  'max_depth': [6, 7, 8, 9],
-                  'min_child_weight': [4],
-                  'verbosity': [0],
-                  'subsample': [0.7],
-                  'colsample_bytree': [0.4, 0.6],
-                  'n_estimators': [100, 200, 300, 400, 500]}
-
-    clf = XGBClassifier()
-    gscv = GridSearchCV(estimator=clf, param_grid=parameters, cv = 4, n_jobs = 4, verbose=True)
-    gscv.fit(X_train, y_train)
-
-    print(gscv.best_params_)
-    # print(gscv)
-    # print(gscv.cv_results_.keys())
-    # print(gscv.cv_results_)
-
-    y_pred = gscv.predict(X_test)
-    y_test = y_test.to_numpy()
-
-    for i in range(len(y_pred)):
-        print('True: {} pred: {}'.format(y_test[i], y_pred[i]))
-
-    score = gscv.score(X_test, y_test)
-    print(score)
 
 
 
-predict_labels(X, y)
-
-# print(fires_df)
-
-reduced_data = reduced_data.iloc[::-1]
-for ind, row in reduced_data.iterrows():
-    plot_PCA_data(row)
-    plot_sentiment_for_fire(row)
 
 
-# i = 0
-# for ind, row in reduced_data['reduced_data'].iteritems():
-#     days = list(range(len(row)))
-#     label = labels[i]
-#     ax[label].plot(days, row, c=colors[label])
-#     i += 1
+
+
+#
+# # OLD MARCH 21 WORK - PCA OF SENTIMENT VECTORS, KMEANS OF FIRES ETC
+#
+#
+# fires_df = fires_df.sort_values(['s_duration', 'fire_ID'], ascending=[0,1])
+#
+#
+# pca_dim = 8
+# pca_var = 'avg_sentiment'
+#
+# reduced_data = perform_PCA(fires_df,pca_dim, pca_var)
+# x = pd.DataFrame.from_records(np.array(reduced_data['PCA_data']))
+#
+# kmeans, k = run_kmeans(14, x)
+# labels = kmeans.labels_
+# reduced_data['label'] = labels
+#
+# colors = ['red','green','blue','purple', 'cyan', 'orange', 'yellow', 'navy', 'black', 'slateblue', 'indigo', 'plum', 'violet', 'aqua']
+#
+# fig, axs = plt.subplots(k,2, figsize=(20, 10))
+#
+# fig.suptitle('Reduced and Original Dataset coloured by Kmeans label')
+# axs[0,0].set_title('Reduced Data (PCA)')
+# axs[1,0].set(xlabel='Day', ylabel=pca_var)
+# axs[0,1].set_title('Original Data')
+# axs[1,1].set(xlabel='Day', ylabel=pca_var)
+#
+# reduced_label_means = []
+# x_label_means = []
+# for l in range(k):
+#     fires = reduced_data[reduced_data['label'] == l]
+#
+#     red_data = pd.DataFrame.from_records(np.array(fires['PCA_data']))
+#     rd_mean = np.mean(red_data)
+#     reduced_label_means.append(rd_mean)
+#     x = pd.DataFrame.from_records(np.array(fires[pca_var]))
+#     mean_x = np.mean(x)
+#     x_label_means.append(mean_x)
+#
+#     for ind, fire in fires.iterrows():
+#         rd = fire['PCA_data']
+#         x = fire[pca_var]
+#         axs[l,0].plot(range(len(rd)), rd, c=colors[l])
+#         axs[l,1].plot(range(len(x)), x, c=colors[l])
+#
+#     axs[l,0].plot(range(len(rd_mean)), rd_mean, c='black')
+#     axs[l,1].plot(range(len(mean_x)), mean_x, c='black')
+#     axs[l,0].set(ylabel=pca_var)
+#     axs[l,0].set(ylabel=pca_var)
+#     # axs[l,0].plot(np.unique(x), np.poly1d(np.polyfit(x, range(len(x)), 1))(np.unique(x)))
+#
 # plt.show()
-
 #
-# plot_stack(fires_df, 6, 14)
-# plot_stack(fires_df, 10, 14)
-
-# fig, axs = plt.subplots(k,2)
+# def plot_PCA_data(fire):
+#     fig, ax = plt.subplots(figsize=(20, 10))
+#     fig.suptitle('Reduced Data Sentiment Curve for fire id {}'.format(fire['fire_ID']))
 #
-# i = 0
+#     reduced_data = fire['PCA_data']
+#     ax.plot(range(len(reduced_data)), reduced_data)
+#     ax.set(xlabel='t', ylabel=pca_var)
+#     ax.set_ylim([-1, 1])
+#     ax.plot(range(len(reduced_data)), np.zeros(len(reduced_data)), color='deepskyblue', ls=':')
+#     plt.show()
+#
+#
+#
+# # DATA MODELLING / ML
+# # X = PHYSICAL VARIABLES - PREDICTORS
+# # Y = SOCIAL VARIABLES - TARGETS
+#
+#
+# X = reduced_data.filter(predictors, axis=1) # 'direction', 'landcover', 'latitude', 'longitude',
+#
+# Y = reduced_data.filter(['sentiment', 'overall_sentiment', 'overall_positive_sentiment', 'overall_negative_sentiment',
+#                          'magnitude', 'overall_magnitude', 'num_tweets', 'total_tweets', 'avg_sentiment',
+#                          'avg_magnitude', 's_mean', 's_var', 'm_mean', 'm_var', 'reduced_data', 'label'], axis=1)
+#
+# y = Y['label']
+#
+#
+# def predict_labels(X, labels):
+#     X_train, X_test, y_train, y_test = train_test_split(X, labels, test_size=0.25)
+#
+#     # param_grid = {
+#     #     'booster': ['gbtree', 'dart'],
+#     #     'n_estimators': [100,500],
+#     #     'eta': [0.1,0.3],
+#     #     #'gamma': [0, 1],
+#     #     'max_depth': [2,4],
+#     #     #'lambda': [1,2],
+#     #     #'alpha': [0,1],
+#     #     #'tree_method': ['auto', 'exact', 'approx', 'hist']
+#     # }
+#
+#     parameters = {'nthread': [4], #when use hyperthread, xgboost may become slower
+#                   'objective': ['reg:logistic'],
+#                   'learning_rate': [0.0001, 0.001, 0.01, 0.1, 0.2], #so called `eta` value
+#                   'max_depth': [6, 7, 8, 9],
+#                   'min_child_weight': [4],
+#                   'verbosity': [0],
+#                   'subsample': [0.7],
+#                   'colsample_bytree': [0.4, 0.6],
+#                   'n_estimators': [100, 200, 300, 400, 500]}
+#
+#     clf = XGBClassifier()
+#     gscv = GridSearchCV(estimator=clf, param_grid=parameters, cv = 4, n_jobs = 4, verbose=True)
+#     gscv.fit(X_train, y_train)
+#
+#     print(gscv.best_params_)
+#     # print(gscv)
+#     # print(gscv.cv_results_.keys())
+#     # print(gscv.cv_results_)
+#
+#     y_pred = gscv.predict(X_test)
+#     y_test = y_test.to_numpy()
+#
+#     for i in range(len(y_pred)):
+#         print('True: {} pred: {}'.format(y_test[i], y_pred[i]))
+#
+#     score = gscv.score(X_test, y_test)
+#     print(score)
+#
+#
+#
+# predict_labels(X, y)
+#
+# # print(fires_df)
+#
+# reduced_data = reduced_data.iloc[::-1]
 # for ind, row in reduced_data.iterrows():
-#     red_data = row['reduced_data']
-#     avg_s = row[pca_var]
-#     rd_x = list(range(len(red_data)))
-#     s_x = list(range(len(avg_s)))
-#     label = labels[i]
-#     axs[0,0].set_title('Reduced Data (PCA)')
-#     axs[0,1].set(xlabel='Day', ylabel=pca_var)
+#     plot_PCA_data(row)
+#     plot_sentiment_for_fire(row)
 #
-#     axs[0,1].set_title('Original Data')
-#     axs[1,1].set(xlabel='Day', ylabel=pca_var)
 #
-#     axs[label,0].plot(rd_x, red_data, c=colors[label])
-#     axs[label,1].plot(s_x, avg_s, c=colors[label])
-#     i += 1
+# # i = 0
+# # for ind, row in reduced_data['reduced_data'].iteritems():
+# #     days = list(range(len(row)))
+# #     label = labels[i]
+# #     ax[label].plot(days, row, c=colors[label])
+# #     i += 1
+# # plt.show()
 #
-# plt.show()
-
-# SHOW CORRELATION MATRIX FOR THE VARIABLES
-# f = plt.figure(figsize=(13, 8))
-# corr = fires_df.corr()
-# corr[abs(corr) < 0.5] = 0
-# plt.matshow(corr, fignum=f.number)
-# plt.xticks(range(fires_df.select_dtypes(['number']).shape[1]), fires_df.select_dtypes(['number']).columns, fontsize=14, rotation=45)
-# plt.yticks(range(fires_df.select_dtypes(['number']).shape[1]), fires_df.select_dtypes(['number']).columns, fontsize=14)
-# cb = plt.colorbar()
-# cb.ax.tick_params(labelsize=14)
-# plt.title('Correlation Matrix', fontsize=16)
+# #
+# # plot_stack(fires_df, 6, 14)
+# # plot_stack(fires_df, 10, 14)
 #
-# plt.savefig('graphs/V4_Corelation_matrix.png')
-# plt.show()
-
-
-# SCATTER MATRIX
-# scatter_matrix(fires_df, alpha=0.2)
-
-
-
-# data visualisation
-geometry = [Point(xy) for xy in zip( fires_df['longitude'], fires_df['latitude'])]
-geo_fires_df = gpd.GeoDataFrame(fires_df, crs=crs, geometry=geometry)
-
-na_map = gpd.read_file('USA_Canada_ShapefileMerge/USA_Canada_ShapefileMerge.shp')
-
-
-# Plotted fires
-# fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,8))
-# na_map.plot(ax=ax, color='grey')
-# geo_fires_df.plot(ax =ax, markersize=5, marker='.')
-# ax.set_xlim([-180, -55])
-# ax.set_ylim([20,80])
-# plt.title('North American Fires in GFA/Investigation Scope')
-# plt.xlabel('Lon')
-# plt.ylabel('Lat')
+# # fig, axs = plt.subplots(k,2)
+# #
+# # i = 0
+# # for ind, row in reduced_data.iterrows():
+# #     red_data = row['reduced_data']
+# #     avg_s = row[pca_var]
+# #     rd_x = list(range(len(red_data)))
+# #     s_x = list(range(len(avg_s)))
+# #     label = labels[i]
+# #     axs[0,0].set_title('Reduced Data (PCA)')
+# #     axs[0,1].set(xlabel='Day', ylabel=pca_var)
+# #
+# #     axs[0,1].set_title('Original Data')
+# #     axs[1,1].set(xlabel='Day', ylabel=pca_var)
+# #
+# #     axs[label,0].plot(rd_x, red_data, c=colors[label])
+# #     axs[label,1].plot(s_x, avg_s, c=colors[label])
+# #     i += 1
+# #
+# # plt.show()
 #
-# plt.savefig('graphs/V4_Scope.png')
-# plt.show()
-
-
+# # SHOW CORRELATION MATRIX FOR THE VARIABLES
+# # f = plt.figure(figsize=(13, 8))
+# # corr = fires_df.corr()
+# # corr[abs(corr) < 0.5] = 0
+# # plt.matshow(corr, fignum=f.number)
+# # plt.xticks(range(fires_df.select_dtypes(['number']).shape[1]), fires_df.select_dtypes(['number']).columns, fontsize=14, rotation=45)
+# # plt.yticks(range(fires_df.select_dtypes(['number']).shape[1]), fires_df.select_dtypes(['number']).columns, fontsize=14)
+# # cb = plt.colorbar()
+# # cb.ax.tick_params(labelsize=14)
+# # plt.title('Correlation Matrix', fontsize=16)
+# #
+# # plt.savefig('graphs/V4_Corelation_matrix.png')
+# # plt.show()
+#
+#
+# # SCATTER MATRIX
+# # scatter_matrix(fires_df, alpha=0.2)
+#
+#
+#
+# # data visualisation
+# geometry = [Point(xy) for xy in zip( fires_df['longitude'], fires_df['latitude'])]
+# geo_fires_df = gpd.GeoDataFrame(fires_df, crs=crs, geometry=geometry)
+#
+# na_map = gpd.read_file('USA_Canada_ShapefileMerge/USA_Canada_ShapefileMerge.shp')
+#
+#
+# # Plotted fires
+# # fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,8))
+# # na_map.plot(ax=ax, color='grey')
+# # geo_fires_df.plot(ax =ax, markersize=5, marker='.')
+# # ax.set_xlim([-180, -55])
+# # ax.set_ylim([20,80])
+# # plt.title('North American Fires in GFA/Investigation Scope')
+# # plt.xlabel('Lon')
+# # plt.ylabel('Lat')
+# #
+# # plt.savefig('graphs/V4_Scope.png')
+# # plt.show()
+#
+#
+#
+# # df = fires_df.drop(columns=['fire_ID', 'direction_cat', 'landcover_cat', 'state_cat'])
+# # df.plot(subplots=True, layout=(4,6))
+# # df.hist(bins=30, figsize=(15, 5))
+# # plt.show()
+#
+# # AUS WORK
+# # aus_df['location_cat'] = aus_df['location'].astype('category').cat.codes
+# # aus_df['state_cat'] = aus_df['state'].astype('category').cat.codes
+# # aus_df['start_doy'] = aus_df['start_date'].apply(lambda  x: datetime.strptime(x, '%Y-%m-%d').timetuple().tm_yday)
+# # aus_df['end_doy'] = aus_df['end_date'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d').timetuple().tm_yday)
+# #
+# # aus_df['tweet_freq'] = aus_df['num_tweets'] / aus_df['duration']
+# # # s_mean = aus_df['sentiment'].apply(lambda x: statistics.mean(x))
+# #
+# #
+# # aus_predictors = ['tweet_freq','latitude','longitude','size','perimeter','start_doy','end_doy','duration','speed','expansion','state_cat','location_cat']
+# # aus_targets = ['sentiment','magnitude','num_tweets']
+# #
+# # X_aus = aus_df[aus_predictors]
+# #
+# # # f(x) aus
+# # for target in aus_targets:
+# #     target_mean = aus_df[target].mean()
+# #     target_var = aus_df[target].var()
+# #     print('Target variable {}: mean: {}, Variance: {}.'.format(target,target_mean, target_var))
+# #     # predict(X_aus, aus_df[target], target)
+#
+#
+#

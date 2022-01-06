@@ -53,7 +53,7 @@ def analyze(text_content):
             sentences.append(sentence_sentiment)
 
         sentimemt = Sentiment.Overall_Sentiment(score, magnitude, sentences)
-        print("Overall Sentiment: score of {} with magnitude of {}".format(score, magnitude))
+        # print("Overall Sentiment: score of {} with magnitude of {}".format(score, magnitude))
 
         return sentimemt
 

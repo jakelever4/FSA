@@ -9,12 +9,6 @@ import tweet_obj
 import re
 import tweepy
 
-bearer_token = 'AAAAAAAAAAAAAAAAAAAAAM2zMgEAAAAAjIFbBetAWCuAzaEL%2B5jSMyofgKE%3DwCGeSfjOYu91nXq0LJiygBheEegg7mU5dhecl2jD2IJIPiwbQI'
-search_url = "https://api.twitter.com/2/tweets/search/all"
-
-api_key = 'RiiQO55ccrGJhuECOVi2pyjXf'
-api_key_secret = 'RsVmLMKBNTgpGfMw7Br6ViQ317ej9fbSoEE8RFEcOl1V6aS7c2'
-
 
 query = 'Dixie Fire'
 filters = 'like wildfire'

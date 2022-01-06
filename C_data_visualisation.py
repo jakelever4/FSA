@@ -9,7 +9,7 @@ import seaborn as sns
 
 pd.set_option("display.max_rows", None, "display.max_columns", None)
 df = pd.read_csv('fires_df.csv', error_bad_lines=False)
-# dfi = pd.read_csv('datasets/AUS_ignitions_2016_I.csv')
+dfi = pd.read_csv('fires_df_aus.csv')
 
 df['s'] = df['overall_sentiment'] / df['total_tweets']
 df['m'] = df['overall_magnitude'] / df['total_tweets']
@@ -21,45 +21,50 @@ crs = {'init': 'epsg:4326'}
 
 
 # SHOW CORRELATION MATRIX FOR THE VARIABLES
-f = plt.figure(figsize=(13, 8))
-corr = df.corr()
-corr[corr<0.8] = 0
-plt.matshow(corr, fignum=f.number)
-plt.xticks(range(df.select_dtypes(['number']).shape[1]), df.select_dtypes(['number']).columns, fontsize=14, rotation=45)
-plt.yticks(range(df.select_dtypes(['number']).shape[1]), df.select_dtypes(['number']).columns, fontsize=14)
-cb = plt.colorbar()
-cb.ax.tick_params(labelsize=14)
-plt.title('Correlation Matrix', fontsize=16)
-
-plt.savefig('graphs/V4_Corelation_matrix.png')
-plt.show()
-
-
-# SCATTER MATRIX
-scatter_matrix(df, alpha=0.2)
+# f = plt.figure(figsize=(13, 8))
+# corr = df.corr()
+# corr[corr<0.8] = 0
+# plt.matshow(corr, fignum=f.number)
+# plt.xticks(range(df.select_dtypes(['number']).shape[1]), df.select_dtypes(['number']).columns, fontsize=14, rotation=45)
+# plt.yticks(range(df.select_dtypes(['number']).shape[1]), df.select_dtypes(['number']).columns, fontsize=14)
+# cb = plt.colorbar()
+# cb.ax.tick_params(labelsize=14)
+# plt.title('Correlation Matrix', fontsize=16)
+#
+# plt.savefig('graphs/V4_Corelation_matrix.png')
+# plt.show()
+#
+#
+# # SCATTER MATRIX
+# scatter_matrix(df, alpha=0.2)
 
 
 # data visualisation
 geometry = [Point(xy) for xy in zip( df['longitude'], df['latitude'])]
-# geometryi = [Point(xy) for xy in zip( dfi['longitude'], dfi['latitude'])]
+geometryi = [Point(xy) for xy in zip( dfi['longitude'], dfi['latitude'])]
 
 geo_df = gpd.GeoDataFrame(df, crs=crs, geometry=geometry)
-# geo_dfi = gpd.GeoDataFrame(dfi, crs=crs, geometry=geometryi)
+geo_dfi = gpd.GeoDataFrame(dfi, crs=crs, geometry=geometryi)
 
 
 na_map = gpd.read_file('USA_Canada_ShapefileMerge/USA_Canada_ShapefileMerge.shp')
-
+aus_map = gpd.read_file('AUS_2021_AUST_SHP_GDA2020/AUS_2021_AUST_GDA2020.shp')
 
 # # Plotted ALL fires
-# fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,8))
-# na_map.plot(ax=ax, color='grey')
-# # geo_dfi.plot(ax =ax, markersize=5, marker='.')
-# plt.title('All Austrailian Fires in Global Fire Atlas Scope')
-# plt.xlabel('Lon')
-# plt.ylabel('Lat')
-#
-# plt.savefig('graphs/AUS_Scope.png')
-# plt.show()
+fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,8))
+na_map.plot(ax=ax, color='grey')
+geo_df.plot(ax =ax, markersize=5, marker='.')
+plt.title('All North American Fires in Global Fire Atlas Scope', fontsize=20)
+plt.xlabel('Lon', fontsize=22)
+plt.ylabel('Lat', fontsize=22)
+
+ax.set_xlim([-180, -55])
+ax.set_ylim([20,80])
+
+plt.tight_layout()
+
+plt.savefig('graphs2/US_Scope.png')
+plt.show()
 
 
 # PLOTTED FIRE MAP WITH SENTIMENT COLOR
@@ -70,11 +75,12 @@ geo_df.plot(column='s', ax =ax, markersize=5, marker='.', label='Avg Sentiment S
 ax.set_xlim([-180, -55])
 ax.set_ylim([20,80])
 plt.legend(prop={'size': 10}, loc='lower left')
-plt.title('North American Fires Coloured by Average Sentiment Score')
-plt.xlabel('Lon')
-plt.ylabel('Lat')
+plt.title('North American Fires Coloured by Average Sentiment Score', fontsize=19)
+plt.xlabel('Lon', fontsize=22)
+plt.ylabel('Lat', fontsize=22)
+plt.tight_layout()
 
-plt.savefig('graphs/V4_Fires_Map_Sentiment.png')
+plt.savefig('graphs2/US_sentiment_map.png')
 plt.show()
 
 
@@ -86,11 +92,12 @@ geo_df.plot(column='m', ax =ax, markersize=5, marker='.', label='Avg Magnitude S
 ax.set_xlim([-180, -55])
 ax.set_ylim([20,80])
 plt.legend(prop={'size': 10}, loc='lower left')
-plt.title('North American Fires Coloured by Average Magnitude Score')
-plt.xlabel('Lon')
-plt.ylabel('Lat')
+plt.title('North American Fires Coloured by Average Magnitude Score', fontsize=19)
+plt.xlabel('Lon', fontsize=22)
+plt.ylabel('Lat', fontsize=22)
+plt.tight_layout()
 
-plt.savefig('graphs/V4_Fires_Map_Magnitude.png')
+plt.savefig('graphs2/US_magnitude_map.png')
 plt.show()
 
 

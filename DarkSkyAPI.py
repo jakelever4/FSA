@@ -10,7 +10,6 @@ import h5py
 
 
 pd.set_option("display.max_rows", None, "display.max_columns", None)
-darksky_key = '1e5cedd536cbfe4197bb7540ac574462'
 
 
 london = [51.51, 0.12]

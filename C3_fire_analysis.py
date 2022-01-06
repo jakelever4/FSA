@@ -19,6 +19,8 @@ db_file = 'US_V3.db'
 conn = SQLite.create_connection(db_file)
 fires_df = SQLite.select_all_fires(conn)
 
+fires_df_aus = pd.read_csv('fires_df_aus.csv')
+
 
 # CONVERT CATEGORICAL VARIABLES
 fires_df['direction_cat'] = fires_df['direction'].astype('category').cat.codes
@@ -33,13 +35,57 @@ fires_df['end_doy'] = fires_df['end_date'].apply(lambda x: datetime.strptime(x, 
 crs = {'init': 'epsg:4326'}
 geometry = [Point(xy) for xy in zip( fires_df['longitude'], fires_df['latitude'])]
 geo_df = gpd.GeoDataFrame(fires_df, crs=crs, geometry=geometry)
-na_map = gpd.read_file('USA_Canada_ShapefileMerge/USA_Canada_ShapefileMerge.shp')
+# na_map = gpd.read_file('USA_Canada_ShapefileMerge/USA_Canada_ShapefileMerge.shp')
+
+
+geometry_aus = [Point(xy) for xy in zip( fires_df_aus['longitude'], fires_df_aus['latitude'])]
+geo_df_aus = gpd.GeoDataFrame(fires_df_aus, crs=crs, geometry=geometry_aus)
+aus_map = gpd.read_file('AUS_2021_AUST_SHP_GDA2020/AUS_2021_AUST_GDA2020.shp')
 
 
 
-fires_df.plot(subplots=True, layout=(3,6))
-fires_df.hist(bins=30, figsize=(15, 5))
-plt.show()
+# fires_df.plot(subplots=True, layout=(3,6))
+# fires_df.hist(bins=30, figsize=(15, 5))
+# plt.show()
+
+
+def plot_aus_fires():
+    # PLOTTED FIRE MAP WITH COLOR BY VARIABLE
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,8))
+    aus_map.plot(ax=ax, alpha=1.0, color='grey')
+    geo_df_aus.plot(ax =ax, markersize=5, marker='.', legend=True)
+    # ax.set_aspect('auto')
+    ax.set_xlim([100, 160])
+    ax.set_ylim([-50,0])
+    plt.legend(prop={'size': 10}, loc='best')
+    plt.title('Australian Fires')
+    plt.xlabel('Lon')
+    plt.ylabel('Lat')
+
+    plt.savefig('A_newgraphs/fires_Map_aus.png')
+    plt.show()
+
+
+plot_aus_fires()
+
+def colour_aus_fires(colour_by):
+    # PLOTTED FIRE MAP WITH COLOR BY VARIABLE
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,8))
+    aus_map.plot(ax=ax, alpha=1.0, color='grey')
+    geo_df_aus.plot(column=colour_by, ax =ax, markersize=5, marker='.', label=colour_by, legend=True)
+    ax.set_xlim([100, 160])
+    ax.set_ylim([-50,0])
+    plt.legend(prop={'size': 10}, loc='best')
+    plt.title('Australian Fires Coloured by {}'.format(colour_by))
+    plt.xlabel('Lon')
+    plt.ylabel('Lat')
+
+    plt.savefig('A_newgraphs/fires_Map_aus_{}.png'.format(colour_by))
+    plt.show()
+
+    
+colour_aus_fires('s_mean')
+colour_aus_fires('m_mean')
 
 def plot_all_fires(colour_by):
     # PLOTTED FIRE MAP WITH COLOR BY VARIABLE

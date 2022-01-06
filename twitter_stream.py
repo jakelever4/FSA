@@ -1,21 +1,22 @@
 import requests
 import json
+import visualise_stream
+from dateutil import parser
 
 
 rules = [
     # {"value": "(wildfire california) OR bushfire", "tag": "california wildfires"},
     # {"value": "(Australia bushfire) OR wildfire", "tag": "australia bushfires"},
-    {"value": "boris johnson", "tag": "potential news"}
+    # {"value": "(Europe bushfire) OR wildfire", "tag": "Europe bushfires"},
+    {"value": "rishi sunak", "tag": "Sunak"},
+    {'value': 'boris johnson', 'tag': 'Johnson'},
+    {'value': 'dominic raab', 'tag': 'Raab'}
     # {"value": "from:BCGovFireInfo", "tag": "BC Gov fire info"}
 ]
 bearer_token = 'AAAAAAAAAAAAAAAAAAAAAM2zMgEAAAAAjIFbBetAWCuAzaEL%2B5jSMyofgKE%3DwCGeSfjOYu91nXq0LJiygBheEegg7mU5dhecl2jD2IJIPiwbQI'
 
 
 def bearer_oauth(r):
-    """
-    Method required by bearer token authentication.
-    """
-
     r.headers["Authorization"] = f"Bearer {bearer_token}"
     r.headers["User-Agent"] = "v2FilteredStreamPython"
     return r
@@ -96,24 +97,22 @@ def get_stream(set):
             json_response = json.loads(response_line)
             # print(json.dumps(json_response, indent=4, sort_keys=True))
             text = process_response(json_response)
-            return text
+            # return text
 
 
 def process_response(response):
-    data = response['data']
-    # rule = response['matching_rules']['tag']
-    text = data['text']
-    print(text)
-    return text
+     
+
+    visualise_stream.update(new_tweet=tweet)
+    # return tweet
 
 
 def start_stream(rules):
     old_rules = get_rules()
     delete_all_rules(old_rules)
     set = set_rules(rules)
-    while True:
-        x = get_stream(set)
-        print(x)
+    data = get_stream(set)
+    # return data
 
 
 start_stream(rules)
